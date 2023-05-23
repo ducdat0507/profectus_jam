@@ -50,6 +50,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
 
     return {
         name: "Tree",
+        color: "#afcfef",
         display: jsx(() => (
             <>
                 XP: {formatWhole(points.value)}<br/>
