@@ -93,9 +93,13 @@ const layer = createLayer(id, function (this: BaseLayer) {
         gameSpeed.value = 1;
         
         let timeout = () => setTimeout(() => {
-            let transform = board.stage.value.getTransform();
-            board.stage.value.zoomAbs(window.innerWidth / 2, window.innerHeight / 2, 1);
-            board.stage.value.moveTo(window.innerWidth / 2, window.innerHeight / 2);
+            if (board.stage.value) {
+                let transform = board.stage.value.getTransform();
+                board.stage.value.zoomAbs(window.innerWidth / 2, window.innerHeight / 2, 1);
+                board.stage.value.moveTo(window.innerWidth / 2, window.innerHeight / 2);
+            } else {
+                timeout();
+            }
         }, 0);
         timeout();
 
