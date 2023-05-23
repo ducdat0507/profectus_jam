@@ -1,9 +1,9 @@
 {
 	"$schema": "./projInfo-schema.json",
 
-	"title": "Profectus",
+	"title": "Delooped",
 	"description": "A project made in Profectus",
-	"id": "",
+	"id": "delooped",
 	"author": "",
 	"discordName": "",
 	"discordLink": "",
@@ -17,10 +17,10 @@
 	"useHeader": true,
 	"banner": null,
 	"logo": "",
-	"initialTabs": [ "main" ],
+	"initialTabs": [ "game" ],
 
-	"maxTickLength": 3600,
-	"offlineLimit": 1,
+	"maxTickLength": 1,
+	"offlineLimit": 0,
 	"enablePausing": true,
 	"exportEncoding": "base64"
 }

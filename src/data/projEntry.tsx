@@ -12,7 +12,9 @@ import type { DecimalSource } from "util/bignum";
 import Decimal, { format, formatTime } from "util/bignum";
 import { render } from "util/vue";
 import { computed, toRaw } from "vue";
-import prestige from "./layers/prestige";
+import gameLayer from "./layers/game";
+import { createBoard } from "features/boards/board";
+import { persistent } from "game/persistence";
 
 /**
  * @hidden
@@ -32,44 +34,18 @@ export const main = createLayer("main", function (this: BaseLayer) {
     });
     const oomps = trackOOMPS(points, pointGain);
 
-    const tree = createTree(() => ({
-        nodes: [[prestige.treeNode]],
-        branches: [],
-        onReset() {
-            points.value = toRaw(this.resettingNode.value) === toRaw(prestige.treeNode) ? 0 : 10;
-            best.value = points.value;
-            total.value = points.value;
-        },
-        resetPropagation: branchedResetPropagation
-    })) as GenericTree;
-
     return {
         name: "Tree",
-        links: tree.links,
         display: jsx(() => (
             <>
-                {player.devSpeed === 0 ? <div>Game Paused</div> : null}
-                {player.devSpeed != null && player.devSpeed !== 0 && player.devSpeed !== 1 ? (
-                    <div>Dev Speed: {format(player.devSpeed)}x</div>
-                ) : null}
-                {player.offlineTime != null && player.offlineTime !== 0 ? (
-                    <div>Offline Time: {formatTime(player.offlineTime)}</div>
-                ) : null}
-                <div>
-                    {Decimal.lt(points.value, "1e1000") ? <span>You have </span> : null}
-                    <h2>{format(points.value)}</h2>
-                    {Decimal.lt(points.value, "1e1e6") ? <span> points</span> : null}
-                </div>
-                {Decimal.gt(pointGain.value, 0) ? <div>({oomps.value})</div> : null}
-                <Spacer />
-                {render(tree)}
+            a
             </>
         )),
+        minimizable: false,
         points,
         best,
         total,
         oomps,
-        tree
     };
 });
 
@@ -80,7 +56,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
 export const getInitialLayers = (
     /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
     player: Partial<Player>
-): Array<GenericLayer> => [main, prestige];
+): Array<GenericLayer> => [main, gameLayer];
 
 /**
  * A computed ref whose value is true whenever the game is over.

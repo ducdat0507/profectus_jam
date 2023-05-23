@@ -3,7 +3,7 @@
     <template v-else>
         <div id="modal-root" :style="theme" />
         <div class="app" :style="theme" :class="{ useHeader }">
-            <Nav v-if="useHeader" />
+            <!-- <Nav v-if="useHeader" /> -->
             <Game />
             <TPS v-if="unref(showTPS)" />
             <GameOverScreen />
@@ -14,7 +14,9 @@
 </template>
 
 <script setup lang="tsx">
-import "@fontsource/roboto-mono";
+import "@fontsource/roboto-mono/variable.css";
+import "@fontsource/roboto-mono/variable-italic.css";
+import "@fontsource/noto-emoji";
 import Error from "components/Error.vue";
 import { jsx } from "features/feature";
 import state from "game/state";

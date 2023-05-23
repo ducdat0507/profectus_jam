@@ -4,7 +4,7 @@
         class="boardnode"
         :class="{ [node.type]: true, isSelected, isDraggable, ...classes }"
         :style="[{ opacity: dragging?.id === node.id && hasDragged ? 0.5 : 1 }, style ?? []] as unknown as (string | CSSProperties)"
-        :transform="`translate(${position.x},${position.y})${isSelected ? ' scale(1.2)' : ''}`"
+        :transform="`translate(${position.x},${position.y})`"
     >
         <BoardNodeAction
             :actions="actions ?? []"
@@ -110,10 +110,60 @@
                     :stroke="progressColor"
                 />
             </g>
+            <g v-else-if="shape === Shape.Square">
+                <rect
+                    v-if="canAccept"
+                    class="receiver"
+                    :width="size * sqrSize + 16"
+                    :height="size * sqrSize + 16"
+                    :transform="`translate(${-(size * sqrSize + 16) / 2}, ${
+                        -(size * sqrSize + 16) / 2
+                    })`"
+                    :fill="backgroundColor"
+                    :stroke="receivingNode ? '#0F0' : '#0F03'"
+                    :stroke-width="2"
+                />
+
+                <rect
+                    class="body"
+                    :width="size * sqrSize"
+                    :height="size * sqrSize"
+                    :transform="`translate(${(-size * sqrSize) / 2}, ${(-size * sqrSize) / 2})`"
+                    :fill="fillColor"
+                    :stroke="outlineColor"
+                    :stroke-width="4"
+                />
+
+                <rect
+                    v-if="progressDisplay === ProgressDisplay.Fill"
+                    class="progress progressFill"
+                    :width="Math.max(size * sqrSize * progress - 2, 0)"
+                    :height="Math.max(size * sqrSize * progress - 2, 0)"
+                    :transform="`translate(${-Math.max(size * sqrSize * progress - 2, 0) / 2}, ${
+                        -Math.max(size * sqrSize * progress - 2, 0) / 2
+                    })`"
+                    :fill="progressColor"
+                />
+                <rect
+                    v-else
+                    class="progress progressDiamond"
+                    :width="size * sqrSize + 9"
+                    :height="size * sqrSize + 9"
+                    :transform="`translate(${-(size * sqrSize + 9) / 2}, ${
+                        -(size * sqrSize + 9) / 2
+                    })`"
+                    fill="transparent"
+                    :stroke-dasharray="(size * sqrSize + 9) * 4"
+                    :stroke-width="5"
+                    :stroke-dashoffset="
+                        (size * sqrSize + 9) * 4 - progress * (size * sqrSize + 9) * 4
+                    "
+                    :stroke="progressColor"
+                />
+            </g>
 
             <text :fill="titleColor" class="node-title">{{ title }}</text>
         </g>
-
         <transition name="fade" appear>
             <g v-if="label">
                 <text
@@ -147,8 +197,10 @@ import { isVisible } from "features/feature";
 import settings from "game/settings";
 import { CSSProperties, computed, toRefs, unref, watch } from "vue";
 import BoardNodeAction from "./BoardNodeAction.vue";
+import { coerceComponent, isCoercableComponent } from "util/vue";
 
 const sqrtTwo = Math.sqrt(2);
+const sqrSize = 1 + sqrtTwo / 2;
 
 const _props = defineProps<{
     node: BoardNode;
@@ -276,18 +328,6 @@ function mouseUp(e: MouseEvent | TouchEvent) {
 .boardnode {
     cursor: pointer;
     transition-duration: 0s;
-}
-
-.boardnode:hover .body {
-    fill: var(--highlighted);
-}
-
-.boardnode.isSelected .body {
-    fill: var(--accent1) !important;
-}
-
-.boardnode:not(.isDraggable) .body {
-    fill: var(--locked);
 }
 
 .node-title {

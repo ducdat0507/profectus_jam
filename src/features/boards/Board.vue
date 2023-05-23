@@ -102,16 +102,13 @@ const props = toRefs(_props);
 
 const lastMousePosition = ref({ x: 0, y: 0 });
 const dragged = ref({ x: 0, y: 0 });
+const isMouseDown = ref(false);
 const hasDragged = ref(false);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const stage = ref<any>(null);
 
 const sortedNodes = computed(() => {
     const nodes = props.nodes.value.slice();
-    if (props.selectedNode.value) {
-        const node = nodes.splice(nodes.indexOf(props.selectedNode.value), 1)[0];
-        nodes.push(node);
-    }
     if (props.draggingNode.value) {
         const node = nodes.splice(nodes.indexOf(props.draggingNode.value), 1)[0];
         nodes.push(node);
@@ -185,14 +182,11 @@ function mouseDown(e: MouseEvent | TouchEvent, node: BoardNode | null = null, dr
         };
         dragged.value = { x: 0, y: 0 };
         hasDragged.value = false;
+        isMouseDown.value = true;
 
         if (draggable) {
             props.setDraggingNode.value(node);
         }
-    }
-    if (node != null) {
-        props.state.value.selectedNode = null;
-        props.state.value.selectedAction = null;
     }
 }
 
@@ -233,8 +227,11 @@ function drag(e: MouseEvent | TouchEvent) {
     }
 
     if (props.draggingNode.value != null) {
-        e.preventDefault();
-        e.stopPropagation();
+        // e.preventDefault();
+        // e.stopPropagation();
+    } else if (isMouseDown.value && hasDragged.value) {
+        props.state.value.selectedNode = null;
+        props.state.value.selectedAction = null;
     }
 }
 
@@ -260,6 +257,7 @@ function endDragging(node: BoardNode | null, mouseLeave = false) {
         props.state.value.selectedNode = null;
         props.state.value.selectedAction = null;
     }
+    isMouseDown.value = false;
 }
 
 function clickAction(node: BoardNode, actionId: string) {

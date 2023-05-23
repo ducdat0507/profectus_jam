@@ -1,5 +1,5 @@
 import BoardComponent from "features/boards/Board.vue";
-import type { GenericComponent, OptionsFunc, Replace, StyleValue } from "features/feature";
+import type { CoercableComponent, GenericComponent, OptionsFunc, Replace, StyleValue } from "features/feature";
 import {
     Component,
     findFeatures,
@@ -46,7 +46,8 @@ export enum ProgressDisplay {
 /** Node shapes. */
 export enum Shape {
     Circle = "Circle",
-    Diamond = "Triangle"
+    Diamond = "Triangle",
+    Square = "Square"
 }
 
 /** An object representing a node on the board. */

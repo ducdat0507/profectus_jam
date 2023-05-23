@@ -104,7 +104,7 @@ export default defineComponent({
 
         const barStyle = computed(() => {
             const barStyle: Partial<CSSProperties> = {
-                width: unwrapRef(width) + 0.5 + "px",
+                width: unwrapRef(width) + 1 + "px",
                 height: unwrapRef(height) + 0.5 + "px"
             };
             switch (unref(direction)) {
@@ -120,7 +120,7 @@ export default defineComponent({
                     barStyle.clipPath = `inset(0% ${normalizedProgress.value}% 0% 0%)`;
                     break;
                 case Direction.Left:
-                    barStyle.clipPath = `inset(0% 0% 0% ${normalizedProgress.value} + '%)`;
+                    barStyle.clipPath = `inset(0% 0% 0% ${normalizedProgress.value}%)`;
                     break;
                 case Direction.Default:
                     barStyle.clipPath = "inset(0% 50% 0% 0%)";

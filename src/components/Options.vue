@@ -13,7 +13,7 @@
             <div v-if="isTab('behaviour')">
                 <Toggle :title="unthrottledTitle" v-model="unthrottled" />
                 <Toggle v-if="projInfo.enablePausing" :title="isPausedTitle" v-model="isPaused" />
-                <Toggle :title="offlineProdTitle" v-model="offlineProd" />
+                <Toggle v-if="projInfo.offlineLimit > 0" :title="offlineProdTitle" v-model="offlineProd" />
                 <Toggle :title="autosaveTitle" v-model="autosave" />
                 <FeedbackButton v-if="!autosave" class="button save-button" @click="save()">Manually save</FeedbackButton>
             </div>
