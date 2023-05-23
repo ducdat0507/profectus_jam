@@ -83,6 +83,7 @@ import BoardNodeVue from "./BoardNode.vue";
 const _props = defineProps<{
     nodes: Ref<BoardNode[]>;
     types: Record<string, GenericNodeType>;
+    stage: Ref<any>;
     state: Ref<BoardData>;
     visibility: ProcessedComputable<Visibility | boolean>;
     width?: ProcessedComputable<string>;
@@ -157,6 +158,7 @@ watchEffect(() => {
 function onInit(panzoomInstance: any) {
     panzoomInstance.setTransformOrigin(null);
     panzoomInstance.moveTo(stage.value.$el.clientWidth / 2, stage.value.$el.clientHeight / 2);
+    props.stage.value = panzoomInstance;
 }
 
 function mouseDown(e: MouseEvent | TouchEvent, node: BoardNode | null = null, draggable = false) {

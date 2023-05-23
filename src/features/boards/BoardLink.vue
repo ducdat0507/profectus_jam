@@ -1,7 +1,10 @@
 <template>
     <line
         class="link"
-        v-bind="link"
+        v-bind="{
+            ...link,
+            'stroke-width': link.strokeWidth,
+        }"
         :class="{ pulsing: link.pulsing }"
         :x1="startPosition.x"
         :y1="startPosition.y"

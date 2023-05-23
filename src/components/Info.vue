@@ -90,6 +90,7 @@ defineExpose({
 });
 
 function openChangelog() {
+    console.log(props.changelog);
     unref(props.changelog)?.open();
 }
 </script>

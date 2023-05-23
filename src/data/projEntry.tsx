@@ -8,44 +8,70 @@ import type { BaseLayer, GenericLayer } from "game/layers";
 import { createLayer } from "game/layers";
 import type { Player } from "game/player";
 import player from "game/player";
-import type { DecimalSource } from "util/bignum";
+import { DecimalSource, formatWhole } from "util/bignum";
 import Decimal, { format, formatTime } from "util/bignum";
 import { render } from "util/vue";
-import { computed, toRaw } from "vue";
+import { computed, ref, toRaw } from "vue";
 import gameLayer from "./layers/game";
 import { createBoard } from "features/boards/board";
 import { persistent } from "game/persistence";
+import InfoVue from "components/Info.vue";
+import OptionsVue from "components/Options.vue";
+import SavesManagerVue from "components/SavesManager.vue";
+import ChangelogVue from "./Changelog.vue";
 
 /**
  * @hidden
  */
 export const main = createLayer("main", function (this: BaseLayer) {
-    const points = createResource<DecimalSource>(10);
-    const best = trackBest(points);
+    const points = createResource<number>(0);
     const total = trackTotal(points);
 
-    const pointGain = computed(() => {
-        // eslint-disable-next-line prefer-const
-        let gain = new Decimal(1);
-        return gain;
+    let info = ref<JSX.Element | null>(null);
+    let changelog = <ChangelogVue />;
+    let savesManager = <SavesManagerVue />;
+    let options = <OptionsVue />;
+
+    let finishedSetup = false;
+
+    globalBus.on("update", delta => {
+        if (changelog.component && !info.value) {
+            info.value = <InfoVue changelog={changelog.component?.exposed as typeof ChangelogVue} />
+        }
+        if (info.value?.el && !finishedSetup) {
+            let root = document.querySelector("#modal-root") as Element;
+            root.append(root.firstElementChild as Element);
+            if ((root.lastElementChild?.querySelector?.(".modal-header") as HTMLElement)?.innerText == "Changelog") {
+                finishedSetup = true;
+            }
+        }
     });
-    globalBus.on("update", diff => {
-        points.value = Decimal.add(points.value, Decimal.times(pointGain.value, diff));
-    });
-    const oomps = trackOOMPS(points, pointGain);
+
 
     return {
         name: "Tree",
         display: jsx(() => (
             <>
-            a
+                XP: {formatWhole(points.value)}<br/>
+                Hub is coming soon<br/>
+                <button class="feature can" onClick={() => {
+                    player.tabs = ["game"];
+                    gameLayer.startGame();
+                }}>
+                    Start game
+                </button><br/>
+                <button class="feature can" onClick={() => info.value?.component?.exposed?.open()}> Info </button>
+                <button class="feature can" onClick={() => savesManager.component?.exposed?.open()}> Saves manager </button>
+                <button class="feature can" onClick={() => options.component?.exposed?.open()}> Options </button>
+                {info.value}
+                {changelog}
+                {savesManager}
+                {options}
             </>
         )),
         minimizable: false,
         points,
-        best,
         total,
-        oomps,
     };
 });
 

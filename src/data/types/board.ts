@@ -23,9 +23,9 @@ export const building = {
         "damager": Shape.Circle,
         "effector": Shape.Diamond,
         "generator": Shape.Square,
-    }[buildings[((node.state as { target: Building }).target.type as string)].class]),
+    }[buildings[((node.state as { target: Building }).target.type as string)]?.class]),
     size: 30,
-    title: node => buildings[((node.state as { target: Building }).target.type as string)].icon,
-    fillColor: node => buildings[((node.state as { target: Building }).target.type as string)].color,
+    title: node => buildings[((node.state as { target: Building }).target.type as string)]?.icon,
+    fillColor: node => buildings[((node.state as { target: Building }).target.type as string)]?.color,
     classes: { building: true },
 } as NodeTypeOptions;

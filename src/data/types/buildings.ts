@@ -45,7 +45,7 @@ export const plasma = {
         damage: { 
             name: "Damage", 
             effect: (x) => 3 + x, 
-            cost: (x) => ({ energy: 300 * 1.4 ** x }), 
+            cost: (x) => ({ energy: 200 * 1.2 ** x }), 
             unit: "/s",
         },
     },

@@ -256,6 +256,8 @@ export interface BaseBoard {
     /** An auto-generated ID for identifying features that appear in the DOM. Will not persist between refreshes or updates. */
     id: string;
     /** All the nodes currently on the board. */
+    stage: Ref<any>;
+    /** All the nodes currently on the board. */
     nodes: Ref<BoardNode[]>;
     /** The currently selected node, if any. */
     selectedNode: Ref<BoardNode | null>;
@@ -408,6 +410,7 @@ export function createBoard<T extends BoardOptions>(
         }
         board.draggingNode = ref(null);
         board.receivingNode = ref(null);
+        board.stage = ref(null);
         processComputable(board as T, "visibility");
         setDefault(board, "visibility", Visibility.Visible);
         processComputable(board as T, "width");
@@ -546,6 +549,7 @@ export function createBoard<T extends BoardOptions>(
             const {
                 nodes,
                 types,
+                stage,
                 state,
                 visibility,
                 width,
@@ -562,6 +566,7 @@ export function createBoard<T extends BoardOptions>(
             return {
                 nodes,
                 types,
+                stage,
                 state,
                 visibility,
                 width,

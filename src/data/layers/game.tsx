@@ -8,11 +8,11 @@ import { JSXFunction, jsx } from "features/feature";
 import { createHotkey } from "features/hotkey";
 import { createReset } from "features/reset";
 import MainDisplay from "features/resources/MainDisplay.vue";
-import { Resource, createResource } from "features/resources/resource";
+import { Resource, createResource, trackTotal } from "features/resources/resource";
 import { addTooltip } from "features/tooltips/tooltip";
 import { createResourceTooltip } from "features/trees/tree";
 import { BaseLayer, createLayer } from "game/layers";
-import { DecimalSource, format } from "util/bignum";
+import { DecimalSource, format, formatTime } from "util/bignum";
 import { render } from "util/vue";
 import { createLayerTreeNode, createResetButton } from "../common";
 import { BoardNode, BoardNodeLink, GenericBoard, createBoard } from "features/boards/board";
@@ -22,12 +22,13 @@ import { CSSProperties, StyleValue, computed, ref, unref } from "vue";
 import * as types from "../types/board";
 import player from "game/player";
 import { globalBus } from "game/events";
-import { formatWhole } from "util/break_eternity";
+import Decimal, { formatWhole } from "util/break_eternity";
 import { createBar } from "features/bars/bar";
 import { Direction } from "util/common";
 import * as b from "../types/buildings";
 import "components/common/features.css";
 import vuePlugin from "@vitejs/plugin-vue";
+import ModalVue from "components/Modal.vue";
 
 const buildings = b as { [key: string]: BuildingType };
 
@@ -44,6 +45,13 @@ function loopPositionToId(x: number, y: number) {
 
 let building: Building | undefined = undefined;
 
+enum GameState {
+    New = "",
+    Started = "start",
+    Stopped = "stop",
+    Idle = "idle",
+}
+
 const layer = createLayer(id, function (this: BaseLayer) {
     const name = "Game";
 
@@ -54,9 +62,12 @@ const layer = createLayer(id, function (this: BaseLayer) {
 
     const loops = persistent<Record<string, Loop>>({});
 
+    const lifetime = persistent<number>(0);
     const resources = {
         energy: createResource<number>(0, "Energy"),
     } as { [key: string]: Resource<number>};
+    const resourcesTotal = Object.fromEntries(Object.entries(resources).map(([id, res]) => [id, trackTotal(res)]));
+
     const buildingFactor = persistent<number>(0);
     const buildingFactors = persistent<{ [key: string]: number }>({});
 
@@ -64,19 +75,29 @@ const layer = createLayer(id, function (this: BaseLayer) {
         return 1.1 ** (buildingFactor.value + (buildingFactors.value[building] ?? 0));
     }
 
-    const gameState = persistent<string>("");
+    const gameState = persistent<string>("", false);
     const gameSpeed = persistent<number>(0);
+    
+    const xpWorth = ref<number>(0);
 
     function startGame() {
         cycle.value = 0;
         cycleProgress.value = 0;
         health.value = 100;
-        resources.energy.value = 150;
+        resources.energy.value = 1500000;
+        resourcesTotal.energy.value = 0;
         buildingFactor.value = 0;
         buildingFactors.value = {};
 
-        gameState.value = "running";
+        gameState.value = GameState.Started;
         gameSpeed.value = 1;
+        
+        let timeout = () => setTimeout(() => {
+            let transform = board.stage.value.getTransform();
+            board.stage.value.zoomAbs(window.innerWidth / 2, window.innerHeight / 2, 1);
+            board.stage.value.moveTo(window.innerWidth / 2, window.innerHeight / 2);
+        }, 0);
+        timeout();
 
         loops.value = { "0x0": { enemies: [
             {
@@ -86,20 +107,61 @@ const layer = createLayer(id, function (this: BaseLayer) {
                 health: 20,
                 maxHealth: 20,
                 effects: {},
-                loot: { energy: 50 },
+                loot: { energy: 100 },
             }
         ] } };
     }
 
     function endGame() {
-        gameState.value = "ended";
-        gameSpeed.value = 0;
+        gameState.value = GameState.Stopped;
+        gameSpeed.value = 0.1;
+
+        let minPos = { x: 0, y: 0 };
+        let maxPos = { x: 0, y: 0 };
+        for (let id in loops.value) {
+            let {x, y} = loopIdToPosition(id);
+            minPos.x = Math.min(minPos.x, x); minPos.y = Math.min(minPos.y, y);
+            maxPos.x = Math.max(maxPos.x, x); maxPos.y = Math.max(maxPos.y, y);
+        }
+        let moveX = (minPos.x + maxPos.x) * -50;
+        let moveY = (minPos.y + maxPos.y) * -50;
+        let zoomLevel = Math.min(
+            (window.innerWidth) / (maxPos.x - minPos.x + 1) / 120,
+            (window.innerHeight) / (maxPos.y - minPos.y + 1) / 120,
+            1
+        );
+        let timeout = () => setTimeout(() => {
+            if (board.stage.value) {
+                board.stage.value.smoothMoveTo(moveX + window.innerWidth / 2, moveY + window.innerHeight / 2);
+                board.stage.value.smoothZoomAbs(window.innerWidth / 2, window.innerHeight / 2, zoomLevel);
+            } else {
+                timeout();
+            }
+        }, 0);
+        timeout();
+
+
+        setTimeout(() => {
+            for (let node of unref(board.state).nodes) {
+                (node.state as { velocity?: { x: number, y: number } }).velocity = { 
+                    x: Math.random() * 450 - 225,
+                    y: Math.random() * -450,
+                }
+            }
+        }, 3000);
+        setTimeout(() => {
+            xpWorth.value = 
+                Math.sqrt(cycle.value) * Math.sqrt(lifetime.value / 60) 
+                * Object.values(resourcesTotal).reduce((x, y) => x + Math.log10(new Decimal(y.value).toNumber() + 1), 1);
+            endGameModalShown.value = true;
+        }, 6000);
     }
 
     function spawnEnemies() {
         let count = 1 + (0.1 * cycle.value) + (0.01 * cycle.value * cycle.value);
         count = Math.floor(count) + (Math.random() < (count % 1) ? 1 : 0);
         let loopList = Object.values(loops.value);
+        if (loopList.length <= 0) return;
         for (let a = 0; a < count; a++) {
             let health = 18 * (1.05 ** cycle.value) * (Math.random() * .2 + .9);
             loopList[Math.floor(Math.random() * loopList.length)].enemies.push({
@@ -141,17 +203,18 @@ const layer = createLayer(id, function (this: BaseLayer) {
     }
 
     globalBus.on("onLoad", () => {
-        if (gameState.value == "") {
+        if (gameState.value == GameState.New) {
             startGame();
-        } else if (gameState.value == "ended") {
+        } else if (gameState.value == GameState.Stopped) {
             endGame();
         }
     })
 
     globalBus.on("update", delta => {
-        if (gameState.value == "running") {
+        if (gameState.value == GameState.Started) {
             if (gameSpeed.value <= 0) return;
             delta *= gameSpeed.value;
+            lifetime.value += delta;
     
             if (cycle.value >= 1) {
                 cycleProgress.value += delta / (15 + Math.sqrt(cycle.value));
@@ -264,7 +327,6 @@ const layer = createLayer(id, function (this: BaseLayer) {
                     if (enm[BoardConnections]) {
                         for (let from in enm[BoardConnections]) {
                             enm[BoardConnections][from] -= delta;
-                            if (enm[BoardConnections][from] <= 0) delete enm[BoardConnections][from];
                         }
                     }
                 }
@@ -319,6 +381,23 @@ const layer = createLayer(id, function (this: BaseLayer) {
                     selectedBuilding.value = "";
                 }
             }
+        } else if (gameState.value == GameState.Stopped) { 
+            for (let id in loops.value) {
+                for (let enm of loops.value[id].enemies) {
+                    enm.angle += 0.001 * delta;
+                }
+            }
+            for (let node of unref(board.state).nodes) {
+                let state = node.state as { velocity?: { x: number, y: number } };
+                if (state.velocity) {
+                    node.position.x += state.velocity.x * delta;
+                    node.position.y += state.velocity.y * delta;
+                    state.velocity.y += 250 * delta;
+                } else {
+                    node.position.x += (Math.random() * 2 - 1);
+                    node.position.y += (Math.random() * 2 - 1);
+                }
+            }
         }
     });
 
@@ -329,9 +408,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
         state() {
             let nodes: BoardNode[] = [];
 
-            if (gameState.value == "ended") {
-                nodes = unref(board.state)?.nodes ?? [];
-            } else {
+            {
                 let enemies: (Enemy & { position: {x: number, y: number }})[] = [];
     
                 for (let [lid, loop] of Object.entries(loops.value)) {
@@ -385,6 +462,15 @@ const layer = createLayer(id, function (this: BaseLayer) {
                     });
                 }
             }
+            
+            if (gameState.value == GameState.Stopped && unref(board.state)?.nodes.length > 0) {
+                let oldNodes = unref(board.state)?.nodes;
+                for (let id in nodes) {
+                    nodes[id].position.x = oldNodes[id]?.position.x ?? nodes[id].position.x;
+                    nodes[id].position.y = oldNodes[id]?.position.y ?? nodes[id].position.y;
+                    nodes[id].state = oldNodes[id]?.state ?? nodes[id].state;
+                }
+            }
 
             return {
                 nodes,
@@ -406,6 +492,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
                                 stroke: "white",
                                 strokeWidth: 2,
                             });
+                            if (enemy[BoardConnections][from] <= 0) delete enemy[BoardConnections][from];
                         }
                     }
                 }
@@ -422,7 +509,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
         direction: Direction.Right,
         progress: computed(() => cycleProgress.value),
         display: jsx(() => <span class="bar-label">
-            Cycle {formatWhole(cycle.value + 1)}
+            Cycle {formatWhole(cycle.value)}
         </span>),
         fillStyle: { backgroundColor: "#50637c" },
         baseStyle: { backgroundColor: "#0000001f" },
@@ -607,6 +694,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
         }
     }
 
+    const endGameModalShown = ref<boolean>(false);
 
     return {
         name,
@@ -626,13 +714,21 @@ const layer = createLayer(id, function (this: BaseLayer) {
         buildingFactors,
 
         resources,
+        resourcesTotal,
+        lifetime,
 
         board,
+
+        startGame,
+        endGame,
 
         display: jsx(() => (
             <>
                 {render(board)}
-                <div class="game-top">
+                <div class={{
+                    "game-top": true,
+                    "hidden": gameState.value != GameState.Started || cycle.value <= 0
+                }}>
                     <div style="display: flex; height: 31px">
                         <span class="bar-label">
                             {formatWhole(resources.energy.value)} energy
@@ -644,7 +740,10 @@ const layer = createLayer(id, function (this: BaseLayer) {
                         {render(healthBar)}
                     </div>
                 </div>
-                <div class="game-bottom">{(() => {
+                <div class={{
+                    "game-bottom": true,
+                    "hidden": gameState.value != GameState.Started
+                }}>{(() => {
                     let state = (board.selectedNode.value?.state as { target: Loop } | undefined);
                     return <>
                         {state ? <div style="display: flex; height: 31px">
@@ -689,7 +788,10 @@ const layer = createLayer(id, function (this: BaseLayer) {
                         </div>
                     </>
                 })()}</div>
-                <div class="game-right">
+                <div class={{
+                    "game-right": true,
+                    "hidden": gameState.value != GameState.Started
+                }}>
                     <div class="building-list">
                         {
                             Object.entries(buildings).map(([id, building]) => 
@@ -727,6 +829,99 @@ const layer = createLayer(id, function (this: BaseLayer) {
                 }} style={tooltipStyle.value}>
                     {tooltipItem.value}
                 </div>
+                <ModalVue
+                    modelValue={endGameModalShown.value}
+                    v-slots={{
+                        header: () => <div style="text-align: center">
+                            <h1 class="result-title">GAME OVER</h1>
+                            <h2 style="font-style: italic;">
+                                - The cycle has been broken. -
+                            </h2>
+                        </div>,
+                        body: () => <div style="text-align: center">
+                            <div class="result-entry">
+                                <div class="name">Cycles reached</div>
+                                <h1 class="value">{formatWhole(cycle.value)}</h1>
+                            </div> 
+                            <div class="result-entry">
+                                <div class="name">Relative lifetime</div>
+                                <div class="value">{formatTime(lifetime.value)}</div>
+                            </div> 
+                            <div style="width: 75%; margin-top: 10px;">
+                                <div class="name">Total resources gained:</div>
+                                <div class="stat-entries">{Object.entries(resourcesTotal)
+                                    .filter(([id, total]) => Decimal.gt(total.value, 0))
+                                    .map(([id, total]) => <div>
+                                        <div class="name">{resources[id].displayName}</div>
+                                        <div class="value">{formatWhole(total.value)}</div>
+                                    </div>) || "Nothing :("
+                                }</div>
+                            </div> 
+                            <div style="width: 75%; margin-top: 10px;">
+                                <div class="name">Hub rewards:</div>
+                                <div class="stat-entries">
+                                    <div>
+                                        <div class="name">XP</div>
+                                        <div class="value">{formatWhole(xpWorth.value)}</div>
+                                    </div>
+                                </div>
+                            </div> 
+                        </div>,
+                        footer: () => (
+                            <div style="display: flex; text-align: center; --layer-color: #dadafa">
+                                <button
+                                    class="feature can"
+                                    onClick={() => {
+                                        setTimeout(() => {
+                                            main.points.value += xpWorth.value;
+                                            startGame();
+                                        }, 1000);
+                                        endGameModalShown.value = false;
+                                    }}
+                                >
+                                    Replay
+                                </button>
+                                <button
+                                    class="feature can"
+                                    onClick={(e) => {
+                                        try {
+                                            navigator.share({
+                                                title: "Delooped",
+                                                text: "I reached Cycle " + formatWhole(cycle.value) + " on Delooped!",
+                                                url: "https://ducdat0507.itch.io/delooped",
+                                            })
+                                        } catch (error) {
+                                            if (error instanceof TypeError) {
+                                                navigator.clipboard.writeText(
+                                                    "I reached Cycle " + formatWhole(cycle.value) + " on Delooped!\n" +
+                                                    "https://ducdat0507.itch.io/delooped"
+                                                );
+                                                clearTimeout(tooltipTimeout);
+                                                (e.target as HTMLElement).innerText = "Copied to clipboard";
+                                                tooltipTimeout = setTimeout(() => (e.target as HTMLElement).innerText = "Share", 2000);
+                                            }
+                                        }
+                                    }}
+                                >
+                                    Share
+                                </button>
+                                <div style="flex-grow: 1" />
+                                <button
+                                    class="feature can"
+                                    onClick={() => {
+                                        setTimeout(() => {
+                                            main.points.value += xpWorth.value;
+                                            gameState.value = GameState.Idle;
+                                            player.tabs = ["main"];
+                                        }, 1000);
+                                        endGameModalShown.value = false;
+                                    }}
+                                >
+                                    Return to Hub
+                                </button>
+                            </div>
+                        )
+                    }} />
             </>
         )),
         minimizable: false,

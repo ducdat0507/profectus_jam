@@ -121,6 +121,9 @@ ul {
 .game-board .link-enter-active {
 	transition-duration: 0s;
 }
+.game-board .node-move {
+	transition-duration: 0s;
+}
 .game-board .link-move {
 	transition-duration: 0s;
 }
@@ -136,6 +139,10 @@ ul {
     border: 2px solid var(--outline);
 	border-top: none;
 	border-radius: 0 0 6px 6px;
+}
+
+.game-top.hidden {
+	transform: translateY(-120px);
 }
 
 .bar-label {
@@ -165,6 +172,10 @@ ul {
     border: 2px solid var(--outline);
 	border-bottom: none;
 	border-radius: 6px 6px 0 0;
+}
+
+.game-bottom.hidden {
+	transform: translateY(160px);
 }
 
 .building-upgrades {
@@ -197,6 +208,10 @@ ul {
     border: 2px solid var(--outline);
 	border-right: none;
 	border-radius: 6px 0 0 6px;
+}
+
+.game-right.hidden {
+	transform: translateX(80px);
 }
 
 .building-list {
@@ -295,8 +310,9 @@ ul {
 }
 
 .game-tooltip {
-	position: absolute;
-	z-index: 10;
+	position: fixed;
+	z-index: 100000;
+	transform: translate(0, 0);
 	top: 4px;
 	width: max-content;
 	height: fit-content;
@@ -346,13 +362,13 @@ ul {
 	}
 	100% { 
 		opacity: 1;
-		transform: none; 
+		transform: translate(0, 0); 
 	}
 }
 @keyframes game-tooltip-out {
 	0% { 
 		opacity: 1;
-		transform: none; 
+		transform: translate(0, 0); 
 	}
 	100% { 
 		opacity: 0;
@@ -364,7 +380,7 @@ ul {
 	letter-spacing: .05em;
 }
 
-.game-tooltip .stat-entries {
+.stat-entries {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
 	text-align: left;
@@ -372,7 +388,7 @@ ul {
 	gap: 6px;
 }
 
-.game-tooltip .stat-entries > div {
+.stat-entries > div {
 	width: calc(100% - 5px);
 	display: flex;
 	flex-direction: row;
@@ -382,19 +398,63 @@ ul {
 	transition-duration: 0s;
 }
 
-.game-tooltip .stat-entries > div.red {
+.stat-entries > div.red {
 	color: #ff5c5a;
 }
 
-.game-tooltip .stat-entries > div > .name {
+.stat-entries > div > .name {
 	flex-grow: 1;
 	transition-duration: 0s;
 }
 
-.game-tooltip .stat-entries > div > .value {
+.stat-entries > div > .value {
 	text-align: right;
 	transition-duration: 0s;
 }
 
+.result-title {
+	display: block;
+	font-size: 7em;
+	margin-block: -0.75em -0.5em;
+	opacity: 0.1;
+	white-space: nowrap;
+}
 
+.result-entry {
+	width: calc(75%);
+	display: flex;
+	flex-direction: row;
+	align-items: baseline;
+	border-bottom: 2px solid currentColor;
+	padding: 0;
+	transition-duration: 0s;
+}
+
+.result-entry .red {
+	color: #ff5c5a;
+}
+
+.result-entry > .name {
+	flex-grow: 1;
+	text-align: left;
+	transition-duration: 0s;
+	margin: 0;
+}
+
+.result-entry > .value {
+	text-align: right;
+	transition-duration: 0s;
+	margin: 0;
+}
+
+.result-entry > div.value {
+	margin-top: 10px;
+	line-height: 24px;
+}
+
+.result-entry > h1.value {
+	font-size: 38px;
+	line-height: 44px;
+	font-style: italic;
+}
 
