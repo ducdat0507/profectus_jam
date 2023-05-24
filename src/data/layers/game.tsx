@@ -2,7 +2,7 @@
  * @module
  * @hidden
  */
-import { main } from "data/projEntry";
+import { gameModes, main } from "data/projEntry";
 import { createCumulativeConversion } from "features/conversion";
 import { JSXFunction, jsx } from "features/feature";
 import { createHotkey } from "features/hotkey";
@@ -83,14 +83,26 @@ const layer = createLayer(id, function (this: BaseLayer) {
     function startGame() {
         cycle.value = 0;
         cycleProgress.value = 0;
-        health.value = 100;
         resources.energy.value = 100;
         resourcesTotal.energy.value = 0;
         buildingFactor.value = 0;
         buildingFactors.value = {};
+        lifetime.value = 0;
 
         gameState.value = GameState.Started;
         gameSpeed.value = 1;
+
+        switch (main.selectedGameMode.value) {
+            case "standard":
+                health.value = 100;
+                break;
+            case "boosted":
+                health.value = 50;
+                break;
+            case "hardcore":
+                health.value = Number.EPSILON;
+                break;
+        }
         
         let timeout = () => setTimeout(() => {
             if (board.stage.value) {
@@ -119,6 +131,11 @@ const layer = createLayer(id, function (this: BaseLayer) {
     function endGame() {
         gameState.value = GameState.Stopped;
         gameSpeed.value = 0.1;
+
+        main.bestCycle[main.selectedGameMode.value].value = Math.max(
+            main.bestCycle[main.selectedGameMode.value].value,
+            cycle.value
+        )
 
         let minPos = { x: 0, y: 0 };
         let maxPos = { x: 0, y: 0 };
@@ -157,17 +174,35 @@ const layer = createLayer(id, function (this: BaseLayer) {
             xpWorth.value = 
                 Math.sqrt(cycle.value) * Math.sqrt(lifetime.value / 60) 
                 * Object.values(resourcesTotal).reduce((x, y) => x + Math.log10(new Decimal(y.value).toNumber() + 1), 1);
+
+            xpWorth.value *= gameModes[main.selectedGameMode.value].multiplier;
+        
             endGameModalShown.value = true;
         }, 6000);
     }
 
     function spawnEnemies() {
+
         let count = 1 + (0.1 * cycle.value) + (0.01 * cycle.value * cycle.value);
         count = Math.floor(count) + (Math.random() < (count % 1) ? 1 : 0);
         let loopList = Object.values(loops.value);
         if (loopList.length <= 0) return;
+        
+        let enemyFactor: number = 1;
+        switch (main.selectedGameMode.value) {
+            case "standard":
+                enemyFactor = 1;
+                break;
+            case "boosted":
+                enemyFactor = 2;
+                break;
+            case "hardcore":
+                enemyFactor = 3;
+                break;
+        }
+
         for (let a = 0; a < count; a++) {
-            let health = 18 * (1.05 ** cycle.value) * (Math.random() * .2 + .9);
+            let health = 18 * (1.05 ** (cycle.value * enemyFactor)) * (Math.random() * .2 + .9);
             loopList[Math.floor(Math.random() * loopList.length)].enemies.push({
                 angle: Math.random(),
                 lifetime: 0,

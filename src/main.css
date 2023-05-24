@@ -68,11 +68,11 @@ ul {
 	margin: unset;
 }
 
-.tab.game {
+.tab.game, .tab.hub {
 	overflow: hidden;
 }
 
-.game-board {
+.game-board, .hub-board {
 	position: absolute;
 	top: 0px;
 	left: 0px;
@@ -458,3 +458,77 @@ ul {
 	font-style: italic;
 }
 
+
+.hub-board .boardnode .body {
+    stroke: #0000001f;
+	stroke-width: 8px;
+}
+
+.hub-board .boardnode .node-title {
+	fill: black;
+	font-family: "Noto Emoji";
+	filter: drop-shadow(0 0 8px #f7f8ff);
+	transform: translateY(3.2px);
+}
+
+.game-mode-holder {
+	position: relative;
+	left: 0;
+	right: 0;
+	width: 500px;
+	margin: auto;
+	text-align: center; 
+	white-space: nowrap;
+	overflow-x: hidden;
+}
+
+.game-mode-card {
+	position: relative;
+	background: #afcfef;
+	width: 200px;
+	height: 300px;
+	white-space: pre-wrap;
+	margin: 5px;
+}
+
+.game-mode-card.prev {
+	margin-left: -56px;
+}
+
+.game-mode-card.prev::before, .game-mode-card.next::before {
+	content: "";
+	position: absolute;
+	left: -5px;
+	right: -5px;
+	top: -5px;
+	bottom: -5px;
+	z-index: 100;
+}
+
+.game-mode-card.prev::before {
+	background: linear-gradient(-90deg, transparent, var(--background) 50%);
+}
+.game-mode-card.next::before {
+	background: linear-gradient(90deg, transparent, var(--background) 50%);
+}
+
+.game-mode-card hr {
+	background: var(--feature-foreground);
+	border: 0;
+	height: 1px;
+	margin-block: 10px;
+	opacity: .5;
+}
+
+.game-mode-card i {
+	display: flex;
+	height: 160px;
+	align-items: center;
+	justify-content: center;
+}
+
+.game-mode-card h1 {
+	display: block;
+	line-height: 32px;
+	font-style: italic;
+}

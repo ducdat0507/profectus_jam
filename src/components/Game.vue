@@ -7,7 +7,9 @@
             :style="unref(layers[tab]?.style)"
             :class="unref(layers[tab]?.classes)"
         >
-            <Nav v-if="index === 0 && !useHeader" />
+            <div style="display: none">
+                <Nav v-if="index === 0 && !useHeader" />
+            </div>
             <div class="inner-tab">
                 <Layer
                     v-if="layerKeys.includes(tab)"
@@ -47,11 +49,6 @@ function gatherLayerProps(layer: GenericLayer) {
     overflow-x: auto;
     overflow-y: hidden;
     display: flex;
-}
-
-.tabs-container:not(.useHeader) {
-    width: calc(100vw - 50px);
-    margin-left: 50px;
 }
 
 .tab {

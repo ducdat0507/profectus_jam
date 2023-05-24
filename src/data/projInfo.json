@@ -14,7 +14,7 @@
 	"allowGoBack": true,
 	"defaultShowSmall": false,
 	"defaultDecimalsShown": 2,
-	"useHeader": true,
+	"useHeader": false,
 	"banner": null,
 	"logo": "",
 	"initialTabs": [ "game" ],
