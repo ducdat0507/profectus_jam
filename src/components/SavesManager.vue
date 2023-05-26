@@ -1,7 +1,10 @@
 <template>
     <Modal v-model="isOpen" ref="modal">
         <template v-slot:header>
-            <h2>Saves Manager</h2>
+            <h1 class="result-title">ARCHIVE</h1>
+            <h2 style="font-style: italic;">
+                - Manage your save states. -
+            </h2>
         </template>
         <template #body="{ shown }">
             <Draggable
@@ -30,10 +33,10 @@
                     placeholder="Paste your save here!"
                     :class="{ importingFailed }"
                 />
-                <div class="field">
+                <div class="field" style="--layer-color: #dadafa">
                     <span class="field-title">Create Save</span>
                     <div class="field-buttons">
-                        <button class="button" @click="openSave(newSave().id)">New Game</button>
+                        <button class="feature can" @click="openSave(newSave().id)">New Game</button>
                         <Select
                             v-if="Object.keys(bank).length > 0"
                             :options="bank"
@@ -45,9 +48,9 @@
                         />
                     </div>
                 </div>
-                <div class="footer">
+                <div class="footer" style="--layer-color: #dadafa">
                     <div style="flex-grow: 1"></div>
-                    <button class="button modal-default-button" @click="isOpen = false">
+                    <button class="feature can" @click="isOpen = false">
                         Close
                     </button>
                 </div>

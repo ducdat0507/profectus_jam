@@ -1,6 +1,6 @@
 import Spacer from "components/layout/Spacer.vue";
 import { jsx } from "features/feature";
-import { createResource, trackBest, trackOOMPS, trackTotal } from "features/resources/resource";
+import { Resource, createResource, trackBest, trackOOMPS, trackTotal } from "features/resources/resource";
 import type { GenericTree } from "features/trees/tree";
 import { branchedResetPropagation, createTree } from "features/trees/tree";
 import { globalBus } from "game/events";
@@ -14,18 +14,31 @@ import { render } from "util/vue";
 import { computed, ref, toRaw } from "vue";
 import gameLayer from "./layers/game";
 import { BoardNode, GenericBoard, Shape, createBoard } from "features/boards/board";
-import { Persistent, persistent } from "game/persistence";
+import { Persistent, noPersist, persistent } from "game/persistence";
 import InfoVue from "components/Info.vue";
 import OptionsVue from "components/Options.vue";
 import SavesManagerVue from "components/SavesManager.vue";
 import ChangelogVue from "./Changelog.vue";
 import ModalVue from "components/Modal.vue";
 import { Computable } from "util/computed";
+import * as b from "./types/buildings";
+import { BuildingType, CapsuleUpgrade, Objective, SpecialObjective } from "./types/data";
+import { GenericUpgrade, createUpgrade } from "features/upgrades/upgrade";
+import { createCostRequirement } from "game/requirements";
+import Formula from "game/formulas/formulas";
+import { GenericRepeatable, createRepeatable } from "features/repeatable";
+
+const buildings = b as { [key: string]: BuildingType };
 
 export type GameModeInfo = {
     name: string;
     description: string;
     multiplier: number;
+}
+
+enum HubState {
+    Idle = "idle",
+    Transitioning = "trans",
 }
 
 export let gameModes = {
@@ -41,7 +54,7 @@ export let gameModes = {
     },
     hardcore: {
         name: "Hardcore",
-        description: "Hardest enemies.\nNo speed changes.\nNo overstressing.",
+        description: "Hardest enemies.\nNo speed changes.\nStress = Lethal.",
         multiplier: 2
     },
 } as Record<string, GameModeInfo>;
@@ -51,8 +64,13 @@ export let gameModeArray = ["standard", "boosted", "hardcore"];
  * @hidden
  */
 export const main = createLayer("main", function (this: BaseLayer) {
-    const points = createResource<number>(0);
+    const points = createResource<number>(0, "xp");
     const total = trackTotal(points);
+    
+    const capsules = createResource<number>(0, "💊");
+    const timeSinceLastClaim = persistent<number>(0);
+
+    const hubState = persistent<string>("idle", false);
 
     let bestCycle = {
         standard: persistent<number>(0),
@@ -61,6 +79,218 @@ export const main = createLayer("main", function (this: BaseLayer) {
     } as Record<string, Persistent<number>>;
 
     let selectedGameMode = persistent<string>("standard", false);
+
+    let unlockedBuildings = persistent<Record<string, boolean>>({ 
+        beamer: true, 
+        plasma: true, 
+        freezer: true, 
+        energizer: true,
+    });
+    let selectedBuildings = persistent<string[]>(["beamer", "plasma", "freezer", "energizer"]);
+    let focusedBuilding = ref("");
+
+    let unlocks = {
+        collection: persistent(false),
+        research: persistent(false),
+        objectives: persistent(false),
+        capsules: persistent(false),
+    } as Record<string, Persistent<boolean>>;
+
+    let upgrades = {
+        startEnergy: createRepeatable(self => ({
+            display: {
+                title: "Better Funding",
+                description: "Increase the starting Energy budget by 25.",
+                effectDisplay: jsx(() => <>{formatWhole(Decimal.mul(self.amount.value, 25).add(100))}</>),
+                showAmount: false,
+            },
+            limit: 9,
+            requirements: createCostRequirement(() => ({
+                resource: noPersist(points),
+                cost: Formula.variable(self.amount).pow_base(1.5).mul(200).sub(200),
+            })),
+            style: { width: "225px", padding: "0 10px" },
+        })),
+        maxBuildings: createRepeatable(self => ({
+            display: {
+                title: "Bigger Inventory",
+                description: "Increase the maximum amount of buildings you can equip by 1.",
+                effectDisplay: jsx(() => <>{formatWhole(Decimal.add(self.amount.value, 6))} / 14</>),
+                showAmount: false,
+            },
+            limit: 8,
+            requirements: createCostRequirement(() => ({
+                resource: noPersist(points),
+                cost: Formula.variable(self.amount).pow_base(2).mul(300),
+            })),
+            style: { width: "225px", padding: "0 10px" },
+        })),
+        speedManip: createRepeatable(self => ({
+            display: {
+                title: "Speed Manipulation",
+                description: jsx(() => <>
+                    Unlock {Decimal.gte(self.amount.value, 1) ? formatWhole(Decimal.add(self.amount.value, 1).min(4)) + "x / 4x speed change" : "pausing"}.
+                    <br/>Is disabled on certain game modes.
+                </>),
+                showAmount: false,
+            },
+            limit: 4,
+            requirements: createCostRequirement(() => ({
+                resource: noPersist(points),
+                cost: Formula.variable(self.amount).pow_base(5).mul(200),
+            })),
+            style: { width: "225px", padding: "0 10px" },
+        })),
+        sellCooldown: createRepeatable(self => ({
+            display: {
+                title: "Decommission Machine",
+                description: "Reduce the selling cooldown by 5 seconds.",
+                effectDisplay: jsx(() => <>{formatWhole(Decimal.mul(self.amount.value, -5).add(60))}s / 10s</>),
+                showAmount: false,
+            },
+            limit: 10,
+            requirements: createCostRequirement(() => ({
+                resource: noPersist(points),
+                cost: Formula.variable(self.amount).pow_base(1.5).mul(200),
+            })),
+            style: { width: "225px", padding: "0 10px" },
+        })),
+        capsuleGain: createRepeatable(self => ({
+            display: {
+                title: "Capsule Productor",
+                description: "Increase capsule's production speed by 1%.",
+                effectDisplay: jsx(() => <>+{formatWhole(self.amount.value)}%</>),
+                showAmount: false,
+            },
+            visibility: noPersist(unlocks.capsules),
+            requirements: createCostRequirement(() => ({
+                resource: noPersist(points),
+                cost: Formula.variable(self.amount).pow_base(1.3).mul(175),
+            })),
+            style: { width: "225px", padding: "0 10px" },
+        })),
+        capsuleCap: createRepeatable(self => ({
+            display: {
+                title: "Capsule Storage",
+                description: "Increase capsule's maximum storage by 1.",
+                effectDisplay: jsx(() => <>+{formatWhole(self.amount.value)}</>),
+                showAmount: false,
+            },
+            visibility: noPersist(unlocks.capsules),
+            requirements: createCostRequirement(() => ({
+                resource: noPersist(points),
+                cost: Formula.variable(self.amount).pow_base(1.6).mul(200),
+            })),
+            style: { width: "225px", padding: "0 10px" },
+        })),
+    } as Record<string, GenericRepeatable>;
+
+    let objectives = persistent<Record<string, number>>({});
+
+    let objectiveViewMode = ref("normal");
+
+    let normalObjectives = {
+        standardCycle: {
+            name: "First Cycle",
+            description: "Reach Cycle {0} in Standard mode.",
+            target: noPersist(bestCycle.standard),
+            goal: (x) => 10 + x * 5,
+            reward: (x) => ["xp", 10 + x * (x + 1) * .5],
+            exclusiveRewards: {
+                3: ["building", "splatter"],
+                6: ["building", "blaster"],
+                9: ["building", "splitter"],
+                12: ["building", "thunder"],
+            }
+        },
+        boostedCycle: {
+            name: "Second Cycle",
+            description: "Reach Cycle {0} in Boosted mode.",
+            target: noPersist(bestCycle.boosted),
+            goal: (x) => 10 + x * 5,
+            reward: (x) => ["xp", 12 + x * (x + 1)],
+            exclusiveRewards: {
+                2: ["building", "bomber"],
+                4: ["building", "hourglass"],
+                6: ["building", "decayer"],
+            }
+        },
+        hardcoreCycle: {
+            name: "Third Cycle",
+            description: "Reach Cycle {0} in Hardcore mode.",
+            target: noPersist(bestCycle.hardcore),
+            goal: (x) => 10 + x * 5,
+            reward: (x) => ["xp", 15 + x * (x + 1) * 1.5],
+            exclusiveRewards: {
+                1: ["building", "igniter"],
+                3: ["building", "pagoda"],
+            }
+        },
+        upgradeCount: {
+            name: "Not Really a Fair Game",
+            description: "Buy {0} Researches.",
+            target: computed(() => Object.values(upgrades).reduce((x, y) => Decimal.add(x, y.amount.value).toNumber(), 0)),
+            goal: (x) => 3 + x * 2,
+            reward: (x) => ["capsules", 3 + x],
+            exclusiveRewards: {
+                3: ["building", "observer"],
+            }
+        },
+        totalXP: {
+            name: "XP Grinder",
+            description: "Gain a total of {0} XP.",
+            target: noPersist(total),
+            goal: (x) => 500 + x * (x + 1) * (x + 2) * 250,
+            reward: (x) => ["capsules", 3],
+            exclusiveRewards: {
+                6: ["building", "multiplier"],
+            }
+        },
+    } as Record<string, Objective>;
+
+    let specialObjectives = {
+        anxiety: {
+            name: "Anxiety",
+            description: "Reach 200% stress.",
+            reward: ["building", "stablizer"],
+        },
+        stucked: {
+            name: "Stucked",
+            description: "Get yourself in a \"softlocked\" state.",
+            reward: ["building", "pins"],
+        },
+    } as Record<string, SpecialObjective>;
+    
+    let allocatedCapsules = persistent<Record<string, number>>({});
+
+    let capsuleUpgrades = {
+        xp: {
+            name: "XP Core",
+            description: "+{0}% xp gain.",
+            formula: (x) => x,
+        },
+        energy: {
+            name: "Energy Core",
+            description: "+{0} starting Energy.",
+            formula: (x) => x,
+        },
+        capsules: {
+            name: "Capsule Core",
+            description: "+{0}% capsule production.",
+            formula: (x) => Math.sqrt(x),
+            precision: 2,
+        },
+        capacity: {
+            name: "Capacity Core",
+            description: "+{0} capsule capacity.",
+            formula: (x) => Math.sqrt(x / 10),
+            precision: 2,
+        },
+    } as Record<string, CapsuleUpgrade>;
+
+    function getCapsuleEffect(id: string) {
+        return capsuleUpgrades[id].formula(allocatedCapsules.value[id] ?? 0);
+    }
 
     const board = createBoard(() => ({
         startNodes: () => [],
@@ -92,6 +322,34 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     position: { 
                         x: Math.sin(player.timePlayed / 20 + Math.PI * 1.33333) * 150, 
                         y: Math.cos(player.timePlayed / 20 + Math.PI * 1.33333) * 150,  
+                    }, 
+                },
+                { 
+                    id: 4, type: "collection",
+                    position: { 
+                        x: Math.sin(player.timePlayed / -50) * 300, 
+                        y: Math.cos(player.timePlayed / -50) * 300,  
+                    }, 
+                },
+                { 
+                    id: 5, type: "research",
+                    position: { 
+                        x: Math.sin(player.timePlayed / -50 + Math.PI) * 300, 
+                        y: Math.cos(player.timePlayed / -50 + Math.PI) * 300,  
+                    }, 
+                },
+                { 
+                    id: 6, type: "objectives",
+                    position: { 
+                        x: Math.sin(player.timePlayed / -50 + Math.PI * .5) * 300, 
+                        y: Math.cos(player.timePlayed / -50 + Math.PI * .5) * 300,  
+                    }, 
+                },
+                { 
+                    id: 7, type: "capsules",
+                    position: { 
+                        x: Math.sin(player.timePlayed / -50 + Math.PI * 1.5) * 300, 
+                        y: Math.cos(player.timePlayed / -50 + Math.PI * 1.5) * 300,  
                     }, 
                 },
             ];
@@ -140,16 +398,52 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     (document.querySelector(".overlay-nav :nth-child(2)") as HTMLElement)?.click();
                 }
             },
+            collection: {
+                shape: Shape.Circle,
+                fillColor: "#afcfef",
+                size: 50,
+                title: "📚",
+                onClick(node) {
+                    showCollectionModal();
+                }
+            },
+            research: {
+                shape: Shape.Circle,
+                fillColor: "#afcfef",
+                size: 50,
+                title: "🔬",
+                onClick(node) {
+                    showResearchModal();
+                }
+            },
+            objectives: {
+                shape: Shape.Circle,
+                fillColor: "#afcfef",
+                size: 50,
+                title: "🎯",
+                onClick(node) {
+                    showObjectivesModal();
+                }
+            },
+            capsules: {
+                shape: Shape.Circle,
+                fillColor: "#afcfef",
+                size: 50,
+                title: "💊",
+                onClick(node) {
+                    showCapsuleModal();
+                }
+            },
         },
     })) as GenericBoard;
 
     function showGameModal() {
-        hubModalHeader.value = <div style="text-align: center">
+        hubModalHeader.value = <>
             <h1 class="result-title">NEW GAME</h1>
             <h2 style="font-style: italic;">
                 - Select your game mode. -
             </h2>
-        </div>;
+        </>;
         hubModalContent.value = () => {
             let index = gameModeArray.indexOf(selectedGameMode.value);
             let prev = gameModeArray[(index + gameModeArray.length - 1) % gameModeArray.length];
@@ -203,17 +497,578 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 <button
                     class="feature can"
                     onClick={() => {
-                        player.tabs = ["game"];
-                        gameLayer.startGame();
-                        hubModalOpen.value = false;
+                        showEquipModal()
                     }}
                 >
-                    Start game
+                    Next
                 </button>
             </div>
         )
         hubModalOpen.value = true;
-        console.log("show game modal");
+    }
+    
+    function showEquipModal() {
+        let slots = Decimal.add(upgrades.maxBuildings.amount.value, 6).toNumber();
+        let maxCost = Decimal.mul(upgrades.startEnergy.amount.value, 25).add(100).toNumber();
+        hubModalHeader.value = () => <>
+            <h1 class="result-title">NEW GAME</h1>
+            <h2 style="font-style: italic;">
+                - Equip your buildings. -
+            </h2>
+            <div class="building-list collection" style="border-bottom: 2px solid var(--foreground); padding-bottom: 20px; transition: none">
+                {
+                    selectedBuildings.value.map((id) => {
+                        let building = buildings[id];
+                        return <button 
+                            class={Object.fromEntries([
+                                [building.class, true],
+                                ["selected", focusedBuilding.value == id],
+                            ])}
+                            onClick={() => {
+                                if (focusedBuilding.value == id) {
+                                    selectedBuildings.value.splice(selectedBuildings.value.indexOf(id), 1);
+                                } else {
+                                    focusedBuilding.value = id
+                                }
+                            }}
+                        >
+                            <div class="background"
+                                style={{
+                                    background: building.color
+                                }}
+                            >
+                                <div class="icon">
+                                    {building.icon}
+                                </div>
+                            </div>
+                        </button>
+                    })
+                }{
+                    [...Array(slots - selectedBuildings.value.length).keys()].map(() => <button class="disabled">a</button>)
+                }
+            </div>
+        </>;
+        hubModalContent.value = () => {
+            return <>
+                <div class="building-list collection" style="transition: none">
+                    {
+                        Object.keys(unlockedBuildings.value).map((id) => {
+                            let building = buildings[id];
+                            return <button 
+                                class={Object.fromEntries([
+                                    [building.class, true],
+                                    ["disabled", selectedBuildings.value.includes(id)],
+                                    ["selected", focusedBuilding.value == id],
+                                ])}
+                                onClick={() => {
+                                    if (focusedBuilding.value == id) {
+                                        if (selectedBuildings.value.includes(id)) {
+                                            selectedBuildings.value.splice(selectedBuildings.value.indexOf(id), 1);
+                                        } else if (selectedBuildings.value.length < slots) {
+                                            selectedBuildings.value.push(id);
+                                        }
+                                    } else {
+                                        focusedBuilding.value = id
+                                    }
+                                }}
+                            >
+                                <div class="background"
+                                    style={{
+                                        background: building.color
+                                    }}
+                                >
+                                    <div class="icon">
+                                        {building.icon}
+                                    </div>
+                                </div>
+                            </button>
+                        })
+                    }
+                </div>
+            </>
+        };
+        hubModalFooter.value = () => <>
+            {focusedBuilding.value ? <div style="display: flex; flex-direction: row; align-content: flex-start; gap: 10px; font-size: 12px; transition: none">
+                <div style="flex: 0 0 calc(50% - 5px); margin: 0">
+                    <h3>{buildings[focusedBuilding.value].name}</h3>{" "}
+                    <h5 style="display: inline-block; margin: 0"><i>- {buildings[focusedBuilding.value].class.toUpperCase()}</i></h5>
+                    <br />
+                    <i>{buildings[focusedBuilding.value].description}</i>
+                </div>
+                <div style="flex: 0 0 calc(50% - 5px); margin: 5px 0 5px 0">
+                <h5>BASE BUILDING COST:</h5>
+                    <div class="stat-entries">
+                        {Object.entries(buildings[focusedBuilding.value].baseCost).map(([id, cost]) => 
+                            <div>
+                                <div class="name">{gameLayer.resources[id].displayName}</div>
+                                <div class="value">{formatWhole(cost)}</div>
+                            </div>
+                        )}  
+                    </div>
+                    <hr style="opacity: 0; margin: 3px" />
+                    <h5>STARTING SPECS:</h5>
+                    <div class="stat-entries">
+                        {Object.entries(buildings[focusedBuilding.value].upgrades).map(([id, upg]) => 
+                            <div>
+                                <div class="name">{upg.name}</div>
+                                <div class="value">{format(upg.effect(0), upg.precision ?? 0) + (upg.unit ?? "")}</div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div> : <div style="text-align: center; font-style: italic;">
+                Click on a building to view its details.
+            </div>}
+            <div style="display: flex; text-align: center; --layer-color: #dadafa">
+                <button
+                    class="feature can"
+                    onClick={() => {
+                        showGameModal();
+                    }}
+                >
+                    Back
+                </button>
+                <button
+                    class="feature can"
+                    onClick={() => {
+                        hubModalOpen.value = false;
+                    }}
+                >
+                    Close
+                </button>
+                <div style="flex-grow: 1" />
+                {
+                    selectedBuildings.value.findIndex(x => buildings[x].class == "damager" 
+                        && Object.keys(buildings[x].baseCost).length <= 1
+                        && (buildings[x].baseCost.energy ?? Infinity) <= maxCost
+                        && buildings[x].onUpdate) >= 0
+                        ? <button
+                            class="feature can"
+                            onClick={() => {
+                                player.tabs = ["game"];
+                                gameLayer.startGame();
+                                hubModalOpen.value = false;
+                            }}
+                        >
+                            Start game
+                        </button>
+                        : <div>
+                            Need at least 1 building that can defeat enemies at start.
+                        </div>
+                }
+            </div>
+        </>
+        focusedBuilding.value = "";
+        hubModalOpen.value = true;
+    }
+    
+    function showCollectionModal() {
+        hubModalHeader.value = <>
+            <h1 class="result-title">COLLECTION</h1>
+            <h2 style="font-style: italic;">
+                - View your unlocked buildings. -
+            </h2>
+        </>;
+        hubModalContent.value = () => {
+            let cost = 0
+            return !unlocks.collection.value ? <div style="text-align: center; --layer-color: #afcfef">
+                <button 
+                    class={{
+                        "feature": true,
+                        "can": points.value >= cost
+                    }}
+                    style="font-size: 10px; width: 200px; height: 80px; margin: 2s0px;"
+                    onClick={() => {
+                        if (points.value >= cost) {
+                            points.value -= cost;
+                            unlocks.collection.value = true;
+                        }
+                    }}
+                >
+                    <h2>Unlock Collection.</h2>
+                    <br/><br/>
+                    Costs: {formatWhole(cost)} xp
+                </button>
+            </div> : <div class="building-list collection">
+                {
+                    Object.entries(buildings).map(([id, building]) => {
+                        return <button 
+                            class={Object.fromEntries([
+                                [building.class, true],
+                                ["disabled", !unlockedBuildings.value[id]],
+                                ["selected", focusedBuilding.value == id],
+                            ])}
+                            onClick={() => focusedBuilding.value = id}
+                        >
+                            <div class="background"
+                                style={{
+                                    background: building.color
+                                }}
+                            >
+                                <div class="icon">
+                                    {building.icon}
+                                </div>
+                            </div>
+                        </button>
+                    })
+                }
+            </div>
+        };
+        hubModalFooter.value = () => <>
+            {focusedBuilding.value ? <div style="display: flex; flex-direction: row; align-content: flex-start; gap: 10px; font-size: 12px; transition: none">
+                <div style="flex: 0 0 calc(50% - 5px); margin: 0">
+                    <h3>{buildings[focusedBuilding.value].name}</h3>{" "}
+                    <h5 style="display: inline-block; margin: 0"><i>- {buildings[focusedBuilding.value].class.toUpperCase()}</i></h5>
+                    <br />
+                    <i>{buildings[focusedBuilding.value].description}</i>
+                </div>
+                <div style="flex: 0 0 calc(50% - 5px); margin: 5px 0 5px 0">
+                <h5>BASE BUILDING COST:</h5>
+                    <div class="stat-entries">
+                        {Object.entries(buildings[focusedBuilding.value].baseCost).map(([id, cost]) => 
+                            <div>
+                                <div class="name">{gameLayer.resources[id].displayName}</div>
+                                <div class="value">{formatWhole(cost)}</div>
+                            </div>
+                        )}  
+                    </div>
+                    <hr style="opacity: 0; margin: 3px" />
+                    <h5>STARTING SPECS:</h5>
+                    <div class="stat-entries">
+                        {Object.entries(buildings[focusedBuilding.value].upgrades).map(([id, upg]) => 
+                            <div>
+                                <div class="name">{upg.name}</div>
+                                <div class="value">{format(upg.effect(0), upg.precision ?? 0) + (upg.unit ?? "")}</div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div> : unlocks.collection.value ? <div style="text-align: center; font-style: italic;">
+                Click on a building to view its details.
+            </div> : ""}
+            <div style="display: flex; text-align: center; --layer-color: #dadafa">
+                <div style="flex-grow: 1" />
+                <button
+                    class="feature can"
+                    onClick={() => {
+                        hubModalOpen.value = false;
+                    }}
+                >
+                    Back
+                </button>
+            </div>
+        </>
+        focusedBuilding.value = "";
+        hubModalOpen.value = true;
+    }
+    
+    function showResearchModal() {
+        hubModalHeader.value = <>
+            <h1 class="result-title">LABORATORY</h1>
+            <h2 style="font-style: italic;">
+                - Replay. Research. Repeat. -
+            </h2>
+        </>;
+        hubModalContent.value = () => {
+            let cost = 250
+            return !unlocks.research.value ? <div style="text-align: center; --layer-color: #afcfef">
+                <button 
+                    class={{
+                        "feature": true,
+                        "can": points.value >= cost
+                    }}
+                    style="font-size: 10px; width: 200px; height: 80px; margin: 20px;"
+                    onClick={() => {
+                        if (points.value >= cost) {
+                            points.value -= cost;
+                            unlocks.research.value = true;
+                        }
+                    }}
+                >
+                    <h2>Unlock Research.</h2>
+                    <br/><br/>
+                    Costs: {formatWhole(cost)} xp
+                </button>
+            </div> : <div style="text-align: center; --layer-color: #afcfef">
+                You have <h2>{formatWhole(points.value)}</h2> xp.
+                <br/><br/>
+                <div style="display: flex; flex-wrap: wrap; justify-content: center">
+                    {Object.values(upgrades).map(render)}
+                </div>
+                <br/><br/>
+            </div>
+        };
+        hubModalFooter.value = (
+            <div style="display: flex; text-align: center; --layer-color: #dadafa">
+                <div style="flex-grow: 1" />
+                <button
+                    class="feature can"
+                    onClick={() => {
+                        hubModalOpen.value = false;
+                    }}
+                >
+                    Back
+                </button>
+            </div>
+        )
+        hubModalOpen.value = true;
+    }
+        
+    function showObjectivesModal() {
+        hubModalHeader.value = () => <>
+            <h1 class="result-title">OBJECTIVES</h1>
+            <h2 style="font-style: italic;">
+                - Do tasks. Reap rewards. -
+            </h2>
+            {unlocks.objectives.value ? <div class="option-tabs">
+                <button 
+                    class={{selected: objectiveViewMode.value == 'normal'}} 
+                    onClick={() => objectiveViewMode.value = 'normal'}
+                >
+                    Normal
+                </button>
+                <button 
+                    class={{selected: objectiveViewMode.value == 'special'}} 
+                    onClick={() => objectiveViewMode.value = 'special'}
+                >
+                    Special
+                </button>
+            </div> : ""}
+        </>;
+        hubModalContent.value = () => {
+            let cost = 0
+            return !unlocks.objectives.value ? <div style="text-align: center; --layer-color: #afcfef">
+                <button 
+                    class={{
+                        "feature": true,
+                        "can": points.value >= cost
+                    }}
+                    style="font-size: 10px; width: 200px; height: 80px; margin: 20px;"
+                    onClick={() => {
+                        if (points.value >= cost) {
+                            points.value -= cost;
+                            unlocks.objectives.value = true;
+                        }
+                    }}
+                >
+                    <h2>Unlock Objectives.</h2>
+                    <br/><br/>
+                    Costs: {formatWhole(cost)} xp
+                </button>
+            </div> : <div style="text-align: center; --layer-color: #afcfef">
+                {
+                    objectiveViewMode.value == "special" ? Object.entries(specialObjectives).map(([id, obj]) => {
+                        let done = objectives.value[id];
+                        return <div class="objective-holder">
+                            <h3>{obj.name}</h3><br/>
+                            {
+                                done === undefined ? obj.description.replaceAll(/\S/g, "?") :
+                                obj.description
+                            }
+                            <hr/>
+                            <div class="building-list" style="justify-content: center; margin-top: 0; transition: none">
+                                <button 
+                                    class={Object.fromEntries([
+                                        ... obj.reward[0] == "building" ? [[buildings[obj.reward[1]].class, true]] : [],
+                                        ["disabled", done === 1],
+                                        ["claimable", done === 0],
+                                    ])}
+                                    onClick={() => {
+                                        if (done === 0) {
+                                            if (obj.reward[0] == "building") {
+                                                unlockedBuildings.value[obj.reward[1]] = true;
+                                            }
+                                            done = objectives.value[id] = 1;
+                                        }
+                                    }}
+                                >
+                                    <div class="background"
+                                            style={{
+                                                background: buildings[obj.reward[1]].color
+                                            }}
+                                        >
+                                        <div class="icon">
+                                            {buildings[obj.reward[1]].icon}
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    }) : Object.entries(normalObjectives).map(([id, obj]) => {
+                        let level = objectives.value[id] ?? 0;
+                        let goal = obj.goal(level);
+                        return <div class="objective-holder">
+                            <h3>{obj.name}</h3><br/>
+                            {obj.description.replace("{0}", format(goal, obj.goalPrecision ?? 0))}
+                            <hr/>
+                            <div style="display: inline-block; min-width: 50px; padding-inline: 5px; border-bottom: 2px solid var(--foreground); transition: none">
+                                {format(obj.target.value, obj.goalPrecision ?? 0)}
+                            </div>
+                            <div class="building-list">
+                                {
+                                    [-3, -2, -1, 0, 1, 2, 3].map(ofs => {
+                                        let exc = obj.exclusiveRewards[level + ofs];
+                                        let rew = obj.reward(level + ofs);
+                                        return <button 
+                                            class={Object.fromEntries([
+                                                ... exc?.[0] == "building" ? [[buildings[exc[1]].class, true]] : [],
+                                                ["disabled", ofs < 0],
+                                                ["claimable", ofs >= 0 && obj.target.value >= obj.goal(level + ofs)],
+                                            ])}
+                                            onClick={() => {
+                                                if (ofs >= 0 && obj.target.value >= obj.goal(level + ofs)) {
+                                                    for (let c = 0; c <= ofs; c++) {
+                                                        let exc = obj.exclusiveRewards[level];
+                                                        if (exc) {
+                                                            if (exc[0] == "building") {
+                                                                unlockedBuildings.value[exc[1]] = true;
+                                                            }
+                                                        } else {
+                                                            let rew = obj.reward(level);
+                                                            let target = ({
+                                                                xp: points,
+                                                                capsules: capsules,
+                                                            })[rew[0]];
+                                                            target.value = Decimal.add(target.value, rew[1]).toNumber()
+                                                        }
+                                                        level = objectives.value[id] = level + 1;
+                                                    }
+                                                }
+                                            }}
+                                        >
+                                            <div class={{goal: true, zero: ofs == 0}}>
+                                                {level + ofs >= 0 ? format(obj.goal(level + ofs), obj.goalPrecision ?? 0) : ""}
+                                            </div>
+                                            {
+                                                level + ofs < 0 ? "" : !exc ? <div class="xp-reward">
+                                                    {format(rew[1], obj.rewardPrecision ?? 0)}<br/>
+                                                    {({
+                                                        xp: "XP",
+                                                        capsules: "💊",
+                                                    })[rew[0]]}
+                                                </div> : <div class="background"
+                                                    style={{
+                                                        background: buildings[exc[1]].color
+                                                    }}
+                                                >
+                                                    <div class="icon">
+                                                        {buildings[exc[1]].icon}
+                                                    </div>
+                                                </div>
+                                            }
+                                        </button>
+                                    })
+                                }
+                            </div>
+                        </div>
+                    })
+                }
+            </div>
+        };
+        hubModalFooter.value = (
+            <div style="display: flex; text-align: center; --layer-color: #dadafa">
+                <div style="flex-grow: 1" />
+                <button
+                    class="feature can"
+                    onClick={() => {
+                        hubModalOpen.value = false;
+                    }}
+                >
+                    Back
+                </button>
+            </div>
+        )
+        hubModalOpen.value = true;
+    }
+    
+    function showCapsuleModal() {
+        hubModalHeader.value = <>
+            <h1 class="result-title">CAPSULES</h1>
+            <h2 style="font-style: italic;">
+                - The solution to everything. -
+            </h2>
+        </>;
+        hubModalContent.value = () => {
+            let cost = 1;
+            let interval = 3600 / (100 + getCapsuleEffect("capsules")) / (100 + new Decimal(upgrades.capsuleGain.amount.value).toNumber()) * 10000;
+            let capacity = 10 + getCapsuleEffect("capacity") + new Decimal(upgrades.capsuleCap.amount.value).toNumber();
+            let amount = Math.min((player.time - timeSinceLastClaim.value) / interval / 1000, capacity);
+            return !unlocks.capsules.value ? <div style="text-align: center; --layer-color: #afcfef">
+                <button 
+                    class={{
+                        "feature": true,
+                        "can": capsules.value >= cost
+                    }}
+                    style="font-size: 10px; width: 200px; height: 80px; margin: 20px;"
+                    onClick={() => {
+                        if (capsules.value >= cost) {
+                            capsules.value -= cost;
+                            unlocks.capsules.value = true;
+                        }
+                    }}
+                >
+                    <h2>Unlock Capsules.</h2>
+                    <br/><br/>
+                    Costs: {formatWhole(cost)} 💊
+                </button>
+            </div> : <div style="text-align: center; --layer-color: #afcfef">
+                You have <h2>{formatWhole(capsules.value)}</h2> 💊.
+                <hr/>
+                {
+                    Object.entries(capsuleUpgrades).map(([id, upg]) => {
+                        let level = allocatedCapsules.value[id] ?? 0;
+                        return <button class="feature" style="background: #afcfef; font-size: 10px; width: 240px; height: 100px;">
+                            {formatWhole(level)} 💊<br/>
+                            <h3>{upg.name}</h3><br/>
+                            {upg.description.replace("{0}", format(upg.formula(level), upg.precision ?? 0))}
+                        </button>
+                    })
+                }
+                <hr/>
+                <button 
+                    class={{feature: true, can: capsules.value >= 1}} 
+                    style="font-size: 12px; width: 240px; height: 50px;"
+                    onClick={() => {
+                        if (capsules.value >= 1) {
+                            capsules.value -= 1;
+                            let list = Object.keys(capsuleUpgrades);
+                            let sel = list[Math.floor(Math.random() * list.length)];
+                            allocatedCapsules.value[sel] = (allocatedCapsules.value[sel] ?? 0) + 1;
+                        }
+                    }}>
+                    Open 1 💊
+                </button>
+                <hr/><br/>
+                You have <h2>{format(amount, 3)} / {format(capacity, 2)}</h2> unclaimed 💊.<br/>
+                You gain 1 💊 every {formatTime(interval)}.
+                <hr/>
+                <button 
+                    class={{feature: true, can: amount >= 1}} 
+                    style="font-size: 12px; width: 240px; height: 50px;"
+                    onClick={() => {
+                        let gain = Math.floor(amount);
+                        capsules.value += gain;
+                        amount -= gain;
+                        timeSinceLastClaim.value = Date.now() - amount * interval * 1000;
+                    }}>
+                    Claim {formatWhole(Math.floor(amount))} 💊
+                </button>
+            </div>
+        };
+        hubModalFooter.value = (
+            <div style="display: flex; text-align: center; --layer-color: #dadafa">
+                <div style="flex-grow: 1" />
+                <button
+                    class="feature can"
+                    onClick={() => {
+                        hubModalOpen.value = false;
+                    }}
+                >
+                    Back
+                </button>
+            </div>
+        )
+        hubModalOpen.value = true;
     }
 
     let hubModalOpen = ref(false);
@@ -229,20 +1084,35 @@ export const main = createLayer("main", function (this: BaseLayer) {
 
         points,
         total,
+        capsules,
+        timeSinceLastClaim,
         
         bestCycle,
 
+        hubState,
         selectedGameMode,
 
+        unlockedBuildings,
+        selectedBuildings,
+
         board,
+        unlocks,
+        upgrades,
+        objectives,
+        allocatedCapsules,
+
+        getCapsuleEffect,
 
         display: jsx(() => (
             <>
                 {render(board)}
                 <div class="game-top">
-                    <div style="display: flex; height: 31px">
-                        <span class="bar-label">
+                    <div style="display: flex; height: 31px; justify-content: center">
+                        <span class="bar-label" style="margin: 4px;">
                             {formatWhole(points.value)} xp
+                        </span>
+                        <span class="bar-label" style="margin: 4px;">
+                            {formatWhole(capsules.value)} 💊
                         </span>
                     </div>
                 </div>

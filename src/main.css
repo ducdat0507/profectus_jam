@@ -179,10 +179,14 @@ ul {
 }
 
 .building-upgrades {
-	height: 31px;
+	height: 151px;
+	margin-top: -120px;
+	width: 100%;
 	display: flex;
 	flex-direction: row;
 	align-items: flex-end;
+	overflow: auto hidden;
+	justify-content: center;
 }
 
 .building-upgrades button {
@@ -190,11 +194,84 @@ ul {
     width: 160px;
     font-size: 10px;
 	transition: all 0.5s, background 0s, z-index 0s 0.5s;
+	flex: 0 0 160px;
 }
 
 .building-upgrades button hr {
 	margin: 2px;
 	height: 0;
+}
+
+.game-left {
+	position: absolute;
+	top: 15px;
+	bottom: 15px;
+	left: 0;
+	width: 32px;
+	padding: 0;
+	background: var(--background);
+    border: 2px solid var(--outline);
+	border-left: none;
+	border-radius: 0 6px 6px 0;
+}
+
+.game-left.hidden {
+	transform: translateX(-80px);
+}
+
+
+.action-list {
+	position: absolute;
+	top: 8px;
+	bottom: 8px;
+	left: 8px;
+	width: 48px;
+}
+
+.action-list button {
+	width: 48px;
+	height: 48px;
+
+    position: relative;
+	border: none;
+	background: transparent;
+	padding: 0;
+
+	display: flex;
+
+	font-size: 24px;
+	padding-bottom: 3px;
+}
+
+.action-list button .background {
+	width: 48px;
+	height: 48px;
+
+    border-radius: 50%;
+    border: 3px solid rgba(0, 0, 0, 0.125);
+    box-sizing: border-box;
+    color: var(--feature-foreground);
+	background: #afcfef;
+
+	display: flex;
+	justify-content: center;
+	align-items: center;
+
+	filter: drop-shadow(2px 2px 4px #0000007f);
+	
+	--extra-transform: translate(0);
+	transform: var(--extra-transform);
+
+	font-size: 24px;
+}
+
+.action-list button .icon {
+	line-height: 24px;
+	margin: 0 0 2px 0;
+}
+
+.action-list button + button {
+	margin-top: 5px;
 }
 
 .game-right {
@@ -218,8 +295,20 @@ ul {
 	position: absolute;
 	top: 8px;
 	bottom: 8px;
-	right: 8px;
-	width: 48px;
+	right: 0;
+	width: 64px;
+	padding-right: 8px;
+
+	display: flex;
+	flex-wrap: no-wrap;
+	flex-direction: column;
+	align-items: flex-end;
+	overflow: visible scroll;
+}
+
+.building-list::-webkit-scrollbar {
+	appearance: none;
+	display: none;
 }
 
 .building-list button {
@@ -232,6 +321,7 @@ ul {
 	padding: 0;
 
 	display: flex;
+	margin: 0;
 
 	font-size: 24px;
 	padding-bottom: 3px;
@@ -252,18 +342,18 @@ ul {
 	align-items: center;
 
 	filter: drop-shadow(2px 2px 4px #0000007f);
-
-	font-size: 24px;
-}
-
-.building-list button .background {
+	
 	--extra-transform: translate(0);
 	transform: var(--extra-transform);
+
+	font-size: 24px;
+	transition: none;
 }
 
 .building-list button .icon {
 	line-height: 24px;
 	margin: 0 0 2px 0;
+	transition: none;
 }
 
 .building-list button + button {
@@ -288,7 +378,7 @@ ul {
 	border-radius: 0%;
 }
 
-.building-list button.selected {
+.building-list:not(.collection) button.selected {
 	filter: drop-shadow(2px 2px 4px #ffffff7f);
 }
 
@@ -297,7 +387,7 @@ ul {
 }
 
 .building-list button.disabled {
-	filter: brightness(0.5) saturate(0.5);
+	filter: brightness(0.4) contrast(0.8) saturate(0.5);
 }
 
 
@@ -480,6 +570,7 @@ ul {
 	text-align: center; 
 	white-space: nowrap;
 	overflow-x: hidden;
+	transition: none;
 }
 
 .game-mode-card {
@@ -488,11 +579,11 @@ ul {
 	width: 200px;
 	height: 300px;
 	white-space: pre-wrap;
-	margin: 5px;
+	margin: 5px !important;
 }
 
 .game-mode-card.prev {
-	margin-left: -56px;
+	margin-left: -56px !important;
 }
 
 .game-mode-card.prev::before, .game-mode-card.next::before {
@@ -531,4 +622,93 @@ ul {
 	display: block;
 	line-height: 32px;
 	font-style: italic;
+}
+
+.building-list.collection, .objective-holder .building-list {
+	position: static;
+	width: 520px;
+	padding: 4px 2px 2px 2px;
+	flex-direction: row;
+	overflow: visible;
+	flex-wrap: wrap;
+}
+
+.building-list.collection button, .objective-holder .building-list button {
+	display: inline-block;
+	width: 70px;
+	height: 70px;
+	margin: 2px;
+	padding-top: 3px;
+	box-sizing: border-box;
+	border: 2px solid var(--outline);
+	border-radius: 12px;
+	background: linear-gradient(#070a13, #171a23);
+	box-shadow: 2px 2px 4px #0007;
+}
+
+.building-list.collection button.selected {
+	transform: translate(-2px, -2px);
+	box-shadow: 4px 4px 4px #0007;
+}
+
+
+.building-list.collection button.selected .background {
+	animation: .4s collection-selected-building alternate cubic-bezier(0.19, 1, 0.22, 1) infinite;
+}
+
+@keyframes collection-selected-building {
+	from {
+		transform: var(--extra-transform);
+	} to {
+		transform: translateY(-16px) var(--extra-transform);
+	}
+}
+
+.objective-holder {
+	width: 540px;
+}
+.objective-holder + .objective-holder {
+	margin-top: 10px;
+	padding-top: 20px;
+	border-top: 2px solid var(--foreground);
+}
+.objective-holder .building-list {
+	margin-top: 15px;
+	transform: scale(0.8);
+}
+.objective-holder .building-list button {
+	--extra-transform: translate(0);
+}
+.objective-holder .building-list button .goal {
+	position: absolute;
+	top: -25px;
+	width: 100%;
+	color: var(--foreground);
+	font-size: 12px;
+}
+.objective-holder .building-list button .goal.zero {
+	top: -36px;
+	font-size: 15px;
+}
+.objective-holder .building-list button .xp-reward {
+	--extra-transform: translate(0);
+	color: var(--foreground);
+	font-size: 12px;
+	transition: none;
+}
+.objective-holder .building-list button.claimable {
+	border-color: var(--foreground);
+	box-shadow: 2px 2px 4px #0007, inset 0 0 8px var(--foreground);
+	animation: .4s collection-selected-building alternate cubic-bezier(0.19, 1, 0.22, 1) infinite;
+}
+.objective-holder .building-list button.claimable .zero {
+	animation: .4s anti-collection-selected-building alternate cubic-bezier(0.19, 1, 0.22, 1) infinite;
+}
+
+@keyframes anti-collection-selected-building {
+	from {
+		transform: translateY(0px);
+	} to {
+		transform: translateY(14px);
+	}
 }

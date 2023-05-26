@@ -1,12 +1,13 @@
 <template>
     <Modal v-model="isOpen">
         <template v-slot:header>
-            <div class="header">
-                <h2>Settings</h2>
-                <div class="option-tabs">
-                    <button :class="{selected: isTab('behaviour')}" @click="setTab('behaviour')">Behaviour</button>
-                    <button :class="{selected: isTab('appearance')}" @click="setTab('appearance')">Appearance</button>
-                </div>
+            <h1 class="result-title">SETTINGS</h1>
+            <h2 style="font-style: italic;">
+                - Tweak your preferences. -
+            </h2>
+            <div class="option-tabs">
+                <button :class="{selected: isTab('behaviour')}" @click="setTab('behaviour')">Behaviour</button>
+                <button :class="{selected: isTab('appearance')}" @click="setTab('appearance')">Appearance</button>
             </div>
         </template>
         <template v-slot:body>

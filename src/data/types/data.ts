@@ -1,6 +1,7 @@
 import { Shape } from "features/boards/board";
 import { CoercableComponent } from "features/feature";
 import { NonPersistent, State } from "game/persistence";
+import { Ref } from "vue";
 
 export const BoardID = Symbol("BoardID");
 export const BoardConnections = Symbol("BoardConnections");
@@ -15,6 +16,7 @@ export type Building = {
     type: string;
     upgrades: { [key: string]: number };
     data: { [key: string]: State };
+    sellValue: { [key: string]: number };
     [BoardID]?: number;
 }
 
@@ -57,3 +59,33 @@ export type BuildingClass =
     "damager" |
     "effector" |
     "generator"
+    
+
+export type Objective = {
+    name: string;
+    description: string;
+    target: Ref<number>;
+    goal: (level: number) => number;
+    goalPrecision?: number;
+    reward: (level: number) => [RewardType, number];
+    exclusiveRewards: { [level: number]: [ExclusiveRewardType, string] };
+    rewardPrecision?: number;
+}
+export type SpecialObjective = {
+    name: string;
+    description: string;
+    reward: [ExclusiveRewardType, string];
+}
+
+export type RewardType = 
+    "xp" | "capsules"
+
+export type ExclusiveRewardType = 
+    "building"
+
+export type CapsuleUpgrade = {
+    name: string;
+    description: string;
+    formula: (level: number) => number;
+    precision?: number;
+}

@@ -18,7 +18,7 @@ import { createLayerTreeNode, createResetButton } from "../common";
 import { BoardNode, BoardNodeLink, GenericBoard, createBoard } from "features/boards/board";
 import { noPersist, persistent } from "game/persistence";
 import { BoardConnections, BoardID, Building, BuildingType, Enemy, Loop } from "../types/data";
-import { CSSProperties, StyleValue, computed, ref, unref } from "vue";
+import { CSSProperties, StyleValue, computed, nextTick, ref, unref } from "vue";
 import * as types from "../types/board";
 import player from "game/player";
 import { globalBus } from "game/events";
@@ -29,6 +29,9 @@ import * as b from "../types/buildings";
 import "components/common/features.css";
 import vuePlugin from "@vitejs/plugin-vue";
 import ModalVue from "components/Modal.vue";
+import { GenericRepeatable, createRepeatable } from "features/repeatable";
+import Formula from "game/formulas/formulas";
+import { createCostRequirement, displayRequirements } from "game/requirements";
 
 const buildings = b as { [key: string]: BuildingType };
 
@@ -65,6 +68,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
     const lifetime = persistent<number>(0);
     const resources = {
         energy: createResource<number>(0, "Energy"),
+        info: createResource<number>(0, "Info"),
     } as { [key: string]: Resource<number>};
     const resourcesTotal = Object.fromEntries(Object.entries(resources).map(([id, res]) => [id, trackTotal(res)]));
 
@@ -77,20 +81,53 @@ const layer = createLayer(id, function (this: BaseLayer) {
 
     const gameState = persistent<string>("", false);
     const gameSpeed = persistent<number>(0);
+    const gamePaused = ref<boolean>(false);
+    const gameStucked = ref<boolean>(false);
+    
+    const sellCooldown = persistent<number>(0);
     
     const xpWorth = ref<number>(0);
+
+    const upgrades = {
+        stress: createRepeatable(self => ({
+            display: jsx(() => <>
+                Level {formatWhole(self.amount.value)}<br/>
+                <h3>Stress</h3>
+                <hr/>
+                &uarr; {formatWhole(Decimal.add(self.amount.value, 101))}% &uarr;<br/>
+                {formatWhole(Decimal.add(self.amount.value, 100))}%<br/>
+                <hr/>
+                {displayRequirements(upgrades.stress.requirements)}
+            </>),
+            requirements: createCostRequirement(() => ({
+                resource: noPersist(resources.info),
+                cost: Formula.variable(self.amount).pow_base(1.1).mul(100),
+            })),
+        })),
+    } as Record<string, GenericRepeatable>;
 
     function startGame() {
         cycle.value = 0;
         cycleProgress.value = 0;
-        resources.energy.value = 100;
-        resourcesTotal.energy.value = 0;
+        resources.energy.value = Decimal.mul(main.upgrades.startEnergy.amount.value, 25)
+            .add(main.getCapsuleEffect("energy")).add(100).toNumber();
+        resources.info.value;
+        nextTick(() => {
+            resourcesTotal.energy.value = resourcesTotal.info.value = 0;
+        })
         buildingFactor.value = 0;
         buildingFactors.value = {};
         lifetime.value = 0;
 
         gameState.value = GameState.Started;
         gameSpeed.value = 1;
+        gameStucked.value = false;
+
+        for (let upg of Object.values(upgrades)) {
+            upg.amount.value = 0;
+        }
+
+        sellCooldown.value = 0;
 
         switch (main.selectedGameMode.value) {
             case "standard":
@@ -172,7 +209,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
         }, 3000);
         setTimeout(() => {
             xpWorth.value = 
-                Math.sqrt(cycle.value) * Math.sqrt(lifetime.value / 60) 
+                Math.sqrt(cycle.value) * Math.sqrt(lifetime.value / 60) * (1 + main.getCapsuleEffect("xp") / 100)
                 * Object.values(resourcesTotal).reduce((x, y) => x + Math.log10(new Decimal(y.value).toNumber() + 1), 1);
 
             xpWorth.value *= gameModes[main.selectedGameMode.value].multiplier;
@@ -187,6 +224,8 @@ const layer = createLayer(id, function (this: BaseLayer) {
         count = Math.floor(count) + (Math.random() < (count % 1) ? 1 : 0);
         let loopList = Object.values(loops.value);
         if (loopList.length <= 0) return;
+
+        resources.info.value = +resources.info.value;
         
         let enemyFactor: number = 1;
         switch (main.selectedGameMode.value) {
@@ -251,9 +290,10 @@ const layer = createLayer(id, function (this: BaseLayer) {
 
     globalBus.on("update", delta => {
         if (gameState.value == GameState.Started) {
-            if (gameSpeed.value <= 0) return;
+            if (gameSpeed.value <= 0 || gamePaused.value) return;
             delta *= gameSpeed.value;
             lifetime.value += delta;
+            sellCooldown.value -= delta;
     
             if (cycle.value >= 1) {
                 cycleProgress.value += delta / (15 + Math.sqrt(cycle.value));
@@ -265,14 +305,32 @@ const layer = createLayer(id, function (this: BaseLayer) {
                 }
             }
             let hasEnemies = false;
-            for (let loop in loops.value) {
-                hasEnemies ||= loops.value[loop].enemies.length > 0;
+            let isStucked = true;
+            for (let loop of Object.values(loops.value)) {
+                hasEnemies ||= loop.enemies.length > 0;
+                isStucked &&= !loop.building || buildings[loop.building.type].class != "damager";
             }
             if (!hasEnemies) {
                 cycleProgress.value = 0;
                 cycle.value++;
                 spawnEnemies();
                 if ((cycle.value + 1) % 2 == 0) spawnLoop();
+            }
+            if (isStucked && !gameStucked.value) {
+                for (let b of main.selectedBuildings.value) {
+                    if (buildings[b].class == "damager" && canAffordBuilding(b)) {
+                        isStucked = false;
+                        break;
+                    }
+                }
+                if (isStucked) {
+                    main.objectives.value.stucked = main.objectives.value.stucked ?? 0;
+                    gameStucked.value = true;
+                    setTimeout(() => {
+                        gamePaused.value = false;
+                        endGame();
+                    }, 3000);
+                }
             }
     
             let enemyMoves: {
@@ -289,10 +347,13 @@ const layer = createLayer(id, function (this: BaseLayer) {
     
                 for (let enm of loop.enemies) {
                     let prevAngle = enm.angle;
+
                     let dist = enm.speed * 0.1 * delta;
                     if (enm.effects.freeze) dist *= 0.5;
+                    if (enm.effects.blaze) dist *= 2;
                     enm.angle += dist;
                     enm.lifetime += Math.abs(dist);
+
                     stress.value += enm.lifetime;
                     enm.angle = ((enm.angle % 1) + 1) % 1;
         
@@ -380,6 +441,9 @@ const layer = createLayer(id, function (this: BaseLayer) {
             if (stress.value > 1) {
                 health.value -= (2 ** stress.value) * delta;
             }
+            if (stress.value >= 2) {
+                main.objectives.value.anxiety = main.objectives.value.anxiety ?? 0;
+            }
             if (health.value <= 0) {
                 endGame();
             }
@@ -407,9 +471,15 @@ const layer = createLayer(id, function (this: BaseLayer) {
                                 type: selectedBuilding.value,
                                 upgrades: {},
                                 data: {},
+                                sellValue: {},
                             }
                             for (let [id, cost] of Object.entries(buildings[selectedBuilding.value].baseCost)) {
-                                resources[id].value -= cost * getBuildingCostFactor(selectedBuilding.value);
+                                let realCost = cost * getBuildingCostFactor(selectedBuilding.value);
+                                resources[id].value -= realCost;
+                                loop.building.sellValue[id] = realCost * 0.75;
+                            }
+                            for (let enm of loop.enemies) {
+                                buildings[selectedBuilding.value].onEnemyEnter?.(loop.building as Building, loop, enm);
                             }
                             buildingFactor.value++;
                             buildingFactors.value[selectedBuilding.value] = (buildingFactors.value[selectedBuilding.value] ?? 0) + 1;
@@ -682,8 +752,24 @@ const layer = createLayer(id, function (this: BaseLayer) {
         if (canAffordUpgrade(building, id)) {
             for (let [uid, cost] of Object.entries(buildings[building.type].upgrades[id].cost(building.upgrades[id] ?? 0))) {
                 resources[uid].value -= cost;
+                building.sellValue[uid] = (building.sellValue[uid] ?? 0) + cost * 0.5;
             }
             building.upgrades[id] = (building.upgrades[id] ?? 0) + 1;
+        }
+    }
+
+    function sellBuilding(loop: Loop) {
+        if (loop.building && loop.building.type != "pins" && sellCooldown.value <= 0) {
+            for (let [uid, val] of Object.entries(loop.building.sellValue)) {
+                resources[uid].value += val;
+                resourcesTotal[uid].value = Decimal.sub(resourcesTotal[uid].value, val).toNumber();
+            }
+            buildingFactor.value--;
+            buildingFactors.value[loop.building.type] = (buildingFactors.value[loop.building.type] ?? 0) - 1;
+            delete loop.building;
+            
+            sellCooldown.value = Decimal.mul(main.upgrades.sellCooldown.amount.value, -5).add(60).toNumber();
+
         }
     }
 
@@ -747,6 +833,8 @@ const layer = createLayer(id, function (this: BaseLayer) {
 
         gameState,
         gameSpeed,
+        sellCooldown,
+        upgrades,
 
         loops,
         buildingFactor,
@@ -772,6 +860,9 @@ const layer = createLayer(id, function (this: BaseLayer) {
                         <span class="bar-label">
                             {formatWhole(resources.energy.value)} energy
                         </span>
+                        {Decimal.gt(resourcesTotal.info.value, 0) ? <span class="bar-label">
+                            {formatWhole(resources.info.value)} info
+                        </span> : ""}
                     </div>
                     {render(cycleBar)}
                     <div style="display: flex">
@@ -811,9 +902,30 @@ const layer = createLayer(id, function (this: BaseLayer) {
                                         </button>
                                     })
                                 }
+                                {
+                                    state.target.building.type == "pins" ? "" : <button class={{
+                                        feature: true,
+                                        can: sellCooldown.value <= 0,
+                                    }} style="width: 100px; flex-basis: 100px" onClick={() => sellBuilding(state?.target as Loop)}>
+                                        {sellCooldown.value <= 0 ? <>
+                                            Sell for
+                                            <hr/>
+                                            {Object.entries(state.target.building.sellValue).map(([id, cost]) => 
+                                                formatWhole(cost) + " " + resources[id].displayName
+                                            ).join(", ")}
+                                        </> : <>
+                                            Sell cooldown
+                                            <hr/>
+                                            {formatTime(sellCooldown.value)}
+                                        </>}
+                                    </button>
+                                }
+                                
                             </div> : <span class="bar-label">
                                 Select a building to build &rarr;
                             </span>}
+                        </div> : Decimal.gt(resourcesTotal.info.value, 0) ? <div class="building-upgrades" style="--layer-color: #afcfef">
+                            {Object.values(upgrades).map(render)}
                         </div> : ""}
                         <div style="display: flex; height: 31px">
                             <span>
@@ -828,13 +940,58 @@ const layer = createLayer(id, function (this: BaseLayer) {
                     </>
                 })()}</div>
                 <div class={{
+                    "game-left": true,
+                    "hidden": gameState.value != GameState.Started || cycle.value <= 0
+                }}>
+                    <div class="action-list">
+                        <button class="action" onClick={() => gamePaused.value = true}>
+                            <div class="background">
+                                <div class="icon">
+                                     ☰
+                                </div>
+                            </div>
+                        </button>
+
+                        { main.selectedGameMode.value == "hardcore" ? "" : <>
+                            {Decimal.gte(main.upgrades.speedManip.amount.value, 1) ? <>
+                                <button class="action speed" onClick={() => gameSpeed.value = 0}>
+                                    <div class="background">
+                                        <div class="icon">
+                                            ⏸️
+                                        </div>
+                                    </div>
+                                </button>
+                                <button class="action speed" onClick={() => gameSpeed.value = 1}>
+                                    <div class="background">
+                                        <div class="icon">
+                                            ▶
+                                        </div>
+                                    </div>
+                                </button>
+                            </> : ""}
+                            {
+                                [...Array(new Decimal(main.upgrades.speedManip.amount.value).max(0).toNumber() - 1).keys()].map((x) => 
+                                    <button class="action speed" onClick={() => gameSpeed.value = x + 2}>
+                                        <div class="background">
+                                            <div class="icon">
+                                                {x + 2}x
+                                            </div>
+                                        </div>
+                                    </button>
+                                )
+                            }
+                        </>}
+                    </div>
+                </div>
+                <div class={{
                     "game-right": true,
                     "hidden": gameState.value != GameState.Started
                 }}>
                     <div class="building-list">
                         {
-                            Object.entries(buildings).map(([id, building]) => 
-                                <button 
+                            main.selectedBuildings.value.map((id) => {
+                                let building = buildings[id];
+                                return <button 
                                     class={Object.fromEntries([
                                         [building.class, true],
                                         ["selected", selectedBuilding.value == id],
@@ -854,7 +1011,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
                                         </div>
                                     </div>
                                 </button>
-                            )
+                            })
                         }
                     </div>
                 </div>
@@ -869,14 +1026,86 @@ const layer = createLayer(id, function (this: BaseLayer) {
                     {tooltipItem.value}
                 </div>
                 <ModalVue
+                    modelValue={gamePaused.value}
+                    v-slots={{
+                        header: () => <>
+                            <h1 class="result-title">PAUSED</h1>
+                            <h2 style="font-style: italic;">
+                                - Operations halted. -
+                            </h2>
+                        </>,
+                        body: () => <div style="text-align: center">
+                            <div class="result-entry">
+                                <div class="name">Cycles reached</div>
+                                <h1 class="value">{formatWhole(cycle.value)}</h1>
+                            </div> 
+                            <div class="result-entry">
+                                <div class="name">Relative lifetime</div>
+                                <div class="value">{formatTime(lifetime.value)}</div>
+                            </div> 
+                            <div style="width: 75%; margin-top: 10px;">
+                                <div class="name">Total resources gained:</div>
+                                <div class="stat-entries">{Object.entries(resourcesTotal)
+                                    .filter(([id, total]) => Decimal.gt(total.value, 0))
+                                    .map(([id, total]) => <div>
+                                        <div class="name">{resources[id].displayName}</div>
+                                        <div class="value">{formatWhole(total.value)}</div>
+                                    </div>) || "Nothing :("
+                                }</div>
+                            </div> 
+                        </div>,
+                        footer: () => (
+                            <div style="display: flex; text-align: center; --layer-color: #dadafa">
+                                <button
+                                    class="feature can"
+                                    onClick={() => {
+                                        setTimeout(() => {
+                                            main.points.value = Decimal.add(main.points.value, xpWorth.value).toNumber();
+                                            endGameModalShown.value = false;
+                                            startGame();
+                                        }, 6001);
+                                        endGame();
+                                        gamePaused.value = false;
+                                    }}
+                                >
+                                    Restart
+                                </button>
+                                <button
+                                    class="feature can"
+                                    onClick={() => {
+                                        setTimeout(() => {
+                                            main.points.value = Decimal.add(main.points.value, xpWorth.value).toNumber();
+                                            gameState.value = GameState.Idle;
+                                            endGameModalShown.value = false;
+                                            player.tabs = ["main"];
+                                        }, 6001);
+                                        endGame();
+                                        gamePaused.value = false;
+                                    }}
+                                >
+                                    Forfeit and Return to Hub
+                                </button>
+                                <div style="flex-grow: 1" />
+                                <button
+                                    class="feature can"
+                                    onClick={() => {
+                                        gamePaused.value = false;
+                                    }}
+                                >
+                                    Continue
+                                </button>
+                            </div>
+                        )
+                    }} />
+                <ModalVue
                     modelValue={endGameModalShown.value}
                     v-slots={{
-                        header: () => <div style="text-align: center">
+                        header: () => <>
                             <h1 class="result-title">GAME OVER</h1>
                             <h2 style="font-style: italic;">
-                                - The cycle has been broken. -
+                                - {gameStucked.value ? "You managed to softlock yourself..." : "The cycle has been broken."} -
                             </h2>
-                        </div>,
+                        </>,
                         body: () => <div style="text-align: center">
                             <div class="result-entry">
                                 <div class="name">Cycles reached</div>
@@ -912,7 +1141,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
                                     class="feature can"
                                     onClick={() => {
                                         setTimeout(() => {
-                                            main.points.value += xpWorth.value;
+                                            main.points.value = Decimal.add(main.points.value, xpWorth.value).toNumber();
                                             startGame();
                                         }, 1000);
                                         endGameModalShown.value = false;
@@ -949,7 +1178,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
                                     class="feature can"
                                     onClick={() => {
                                         setTimeout(() => {
-                                            main.points.value += xpWorth.value;
+                                            main.points.value = Decimal.add(main.points.value, xpWorth.value).toNumber();
                                             gameState.value = GameState.Idle;
                                             player.tabs = ["main"];
                                         }, 1000);

@@ -233,7 +233,7 @@ export function createRepeatable<T extends RepeatableOptions>(
                         {currDisplay.description == null ? null : <Description />}
                         {currDisplay.showAmount === false ? null : (
                             <div>
-                                <br />
+                                <hr />
                                 <>Amount: {formatWhole(genericRepeatable.amount.value)}</>
                                 {Decimal.isFinite(unref(genericRepeatable.limit)) ? (
                                     <> / {formatWhole(unref(genericRepeatable.limit))}</>
@@ -242,13 +242,13 @@ export function createRepeatable<T extends RepeatableOptions>(
                         )}
                         {currDisplay.effectDisplay == null ? null : (
                             <div>
-                                <br />
+                                <hr />
                                 Currently: <EffectDisplay />
                             </div>
                         )}
                         {genericRepeatable.maxed.value ? null : (
                             <div>
-                                <br />
+                                <hr />
                                 {displayRequirements(
                                     genericRepeatable.requirements,
                                     unref(repeatable.amountToIncrease)

@@ -4,12 +4,12 @@
 	"title": "Delooped",
 	"description": "A project made in Profectus",
 	"id": "delooped",
-	"author": "",
+	"author": "ducdat0507",
 	"discordName": "",
 	"discordLink": "",
 
-	"versionNumber": "0.0",
-	"versionTitle": "Initial Commit",
+	"versionNumber": "0.2",
+	"versionTitle": "Slightly Less Prototypey Thing",
 
 	"allowGoBack": true,
 	"defaultShowSmall": false,
@@ -21,6 +21,6 @@
 
 	"maxTickLength": 1,
 	"offlineLimit": 0,
-	"enablePausing": true,
+	"enablePausing": false,
 	"exportEncoding": "base64"
 }

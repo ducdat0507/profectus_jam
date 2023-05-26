@@ -23,10 +23,13 @@
                         </div>
                         <div class="modal-footer">
                             <slot name="footer" :shown="isOpen">
-                                <div class="modal-default-footer">
-                                    <div class="modal-default-flex-grow"></div>
-                                    <button class="button modal-default-button" @click="close">
-                                        Close
+                                <div style="display: flex; text-align: center; --layer-color: #dadafa">
+                                    <div style="flex-grow: 1" />
+                                    <button
+                                        class="feature can"
+                                        @click="close"
+                                    >
+                                        Back
                                     </button>
                                 </div>
                             </slot>
@@ -102,6 +105,7 @@ defineExpose({ isOpen, nodes });
 
 .modal-header {
     width: 100%;
+    text-align: center;
 }
 
 .modal-body {

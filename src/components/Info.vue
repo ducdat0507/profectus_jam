@@ -1,21 +1,26 @@
 <template>
     <Modal v-model="isOpen">
         <template v-slot:header>
-            <div class="info-modal-header">
-                <img class="info-modal-logo" v-if="logo" :src="logo" :alt="title" />
-                <div class="info-modal-title">
-                    <h2>{{ title }}</h2>
-                    <h4>
-                        v{{ versionNumber }}<span v-if="versionTitle">: {{ versionTitle }}</span>
-                    </h4>
-                </div>
-            </div>
+            <h1 class="result-title">DELOOPED</h1>
+            <h2 style="font-style: italic;">
+                - {{ versionTitle }} -
+            </h2>
+            <h4>
+                v{{ versionNumber }}
+            </h4>
         </template>
         <template v-slot:body="{ shown }">
-            <div v-if="shown">
-                <div v-if="author">By {{ author }}</div>
+            <div style="text-align: center" v-if="shown">
+                <div v-if="author">a game by {{ author }}</div>
+                <br />
                 <div>
-                    Made in Profectus, by thepaperpilot with inspiration from Acameada and Jacorb
+                    Made for the
+                    <a style="display: inline-block" href="https://itch.io/jam/profectus-creation-jam" target="_blank">
+                        Profectus Creation Jam
+                    </a>
+                </div>
+                <div style="font-size: smaller; opacity: .5">
+                    (Profectus by thepaperpilot, with inspiration from Acameada and Jacorb)
                 </div>
                 <br />
                 <div class="link" @click="openChangelog">Changelog</div>

@@ -137,4 +137,9 @@ export default defineComponent({
 .clickable > * {
     pointer-events: none;
 }
+
+.clickable :global(hr) {
+    margin: 2px;
+    opacity: 0;
+}
 </style>
