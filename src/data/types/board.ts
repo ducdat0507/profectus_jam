@@ -1,4 +1,4 @@
-import { Shape, NodeTypeOptions } from "features/boards/board";
+import { Shape, NodeTypeOptions, ProgressDisplay } from "features/boards/board";
 import * as b from "./buildings";
 import { Building, BuildingType } from "./data";
 
@@ -22,10 +22,17 @@ export const building = {
     shape: node => ({
         "damager": Shape.Circle,
         "effector": Shape.Diamond,
+        "influencer": Shape.Squircle,
         "generator": Shape.Square,
     }[buildings[((node.state as { target: Building }).target.type as string)]?.class]),
     size: 30,
     title: node => buildings[((node.state as { target: Building }).target.type as string)]?.icon,
     fillColor: node => buildings[((node.state as { target: Building }).target.type as string)]?.color,
+    progress: node => {
+        let bd = (node.state as { target: Building }).target;
+        return buildings[bd.type].progress?.(bd) ?? 0;
+    },
+    progressColor: "var(--foreground)",
+    progressDisplay: ProgressDisplay.Outline,
     classes: { building: true },
 } as NodeTypeOptions;

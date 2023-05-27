@@ -61,7 +61,7 @@ export function createResource<T extends State>(
 }
 
 /** Returns a reference to the highest amount of the resource ever owned, which is updated automatically. */
-export function trackBest(resource: Resource): Ref<DecimalSource> {
+export function trackBest(resource: Ref<DecimalSource>): Ref<DecimalSource> {
     const best = persistent(resource.value);
     watch(resource, amount => {
         if (loadingSave.value) {
@@ -75,7 +75,7 @@ export function trackBest(resource: Resource): Ref<DecimalSource> {
 }
 
 /** Returns a reference to the total amount of the resource gained, updated automatically. "Refunds" count as gain. */
-export function trackTotal(resource: Resource): Ref<DecimalSource> {
+export function trackTotal(resource: Ref<DecimalSource>): Ref<DecimalSource> {
     const total = persistent(resource.value);
     watch(resource, (amount, prevAmount) => {
         if (loadingSave.value) {

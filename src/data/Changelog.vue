@@ -5,7 +5,15 @@
         </template>
         <template v-slot:body>
             <details open>
-                <summary>v0.2.1 Slightly Less Prototypey Thing - <time>2023-05-26</time></summary>
+                <summary>v0.3 Lesser Prototypey Thing - <time>2023-05-27</time></summary>
+                <ul>
+                    <li class="feature">Added new building type - Influencer</li>
+                    <li class="feature">Added new buildings</li>
+                    <li class="feature">Added new objectives</li>
+                </ul>
+            </details>
+            <details open>
+                <summary>v0.2.1 Slightly Less Prototypey Thing - <time>2023-05-27</time></summary>
                 <ul>
                     <li class="fix">Fix breaking error</li>
                 </ul>

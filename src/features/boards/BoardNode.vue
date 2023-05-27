@@ -22,142 +22,39 @@
             @mouseup="mouseUp"
             @touchend.passive="mouseUp"
         >
-            <g v-if="shape === Shape.Circle">
-                <circle
+            <g>
+                <path
                     v-if="canAccept"
                     class="receiver"
-                    :r="size + 8"
+                    :d="getPath(size + 8)"
                     :fill="backgroundColor"
                     :stroke="receivingNode ? '#0F0' : '#0F03'"
                     :stroke-width="2"
                 />
 
-                <circle
+                <path
                     class="body"
-                    :r="size"
+                    :d="getPath(size)"
                     :fill="fillColor"
                     :stroke="outlineColor"
                     :stroke-width="4"
                 />
 
-                <circle
+                <path
                     class="progress progressFill"
                     v-if="progressDisplay === ProgressDisplay.Fill"
-                    :r="Math.max(size * progress - 2, 0)"
+                    :d="getPath(Math.max(size * progress - 2, 0))"
                     :fill="progressColor"
                 />
-                <circle
+                <path
                     v-else
-                    :r="size + 4.5"
+                    :d="getPath(size + 3.5)"
                     class="progress progressRing"
                     fill="transparent"
-                    :stroke-dasharray="(size + 4.5) * 2 * Math.PI"
-                    :stroke-width="5"
-                    :stroke-dashoffset="
-                        (size + 4.5) * 2 * Math.PI - progress * (size + 4.5) * 2 * Math.PI
-                    "
-                    :stroke="progressColor"
-                />
-            </g>
-            <g v-else-if="shape === Shape.Diamond" transform="rotate(45, 0, 0)">
-                <rect
-                    v-if="canAccept"
-                    class="receiver"
-                    :width="size * sqrtTwo + 16"
-                    :height="size * sqrtTwo + 16"
-                    :transform="`translate(${-(size * sqrtTwo + 16) / 2}, ${
-                        -(size * sqrtTwo + 16) / 2
-                    })`"
-                    :fill="backgroundColor"
-                    :stroke="receivingNode ? '#0F0' : '#0F03'"
-                    :stroke-width="2"
-                />
-
-                <rect
-                    class="body"
-                    :width="size * sqrtTwo"
-                    :height="size * sqrtTwo"
-                    :transform="`translate(${(-size * sqrtTwo) / 2}, ${(-size * sqrtTwo) / 2})`"
-                    :fill="fillColor"
-                    :stroke="outlineColor"
-                    :stroke-width="4"
-                />
-
-                <rect
-                    v-if="progressDisplay === ProgressDisplay.Fill"
-                    class="progress progressFill"
-                    :width="Math.max(size * sqrtTwo * progress - 2, 0)"
-                    :height="Math.max(size * sqrtTwo * progress - 2, 0)"
-                    :transform="`translate(${-Math.max(size * sqrtTwo * progress - 2, 0) / 2}, ${
-                        -Math.max(size * sqrtTwo * progress - 2, 0) / 2
-                    })`"
-                    :fill="progressColor"
-                />
-                <rect
-                    v-else
-                    class="progress progressDiamond"
-                    :width="size * sqrtTwo + 9"
-                    :height="size * sqrtTwo + 9"
-                    :transform="`translate(${-(size * sqrtTwo + 9) / 2}, ${
-                        -(size * sqrtTwo + 9) / 2
-                    })`"
-                    fill="transparent"
-                    :stroke-dasharray="(size * sqrtTwo + 9) * 4"
-                    :stroke-width="5"
-                    :stroke-dashoffset="
-                        (size * sqrtTwo + 9) * 4 - progress * (size * sqrtTwo + 9) * 4
-                    "
-                    :stroke="progressColor"
-                />
-            </g>
-            <g v-else-if="shape === Shape.Square">
-                <rect
-                    v-if="canAccept"
-                    class="receiver"
-                    :width="size * sqrSize + 16"
-                    :height="size * sqrSize + 16"
-                    :transform="`translate(${-(size * sqrSize + 16) / 2}, ${
-                        -(size * sqrSize + 16) / 2
-                    })`"
-                    :fill="backgroundColor"
-                    :stroke="receivingNode ? '#0F0' : '#0F03'"
-                    :stroke-width="2"
-                />
-
-                <rect
-                    class="body"
-                    :width="size * sqrSize"
-                    :height="size * sqrSize"
-                    :transform="`translate(${(-size * sqrSize) / 2}, ${(-size * sqrSize) / 2})`"
-                    :fill="fillColor"
-                    :stroke="outlineColor"
-                    :stroke-width="4"
-                />
-
-                <rect
-                    v-if="progressDisplay === ProgressDisplay.Fill"
-                    class="progress progressFill"
-                    :width="Math.max(size * sqrSize * progress - 2, 0)"
-                    :height="Math.max(size * sqrSize * progress - 2, 0)"
-                    :transform="`translate(${-Math.max(size * sqrSize * progress - 2, 0) / 2}, ${
-                        -Math.max(size * sqrSize * progress - 2, 0) / 2
-                    })`"
-                    :fill="progressColor"
-                />
-                <rect
-                    v-else
-                    class="progress progressDiamond"
-                    :width="size * sqrSize + 9"
-                    :height="size * sqrSize + 9"
-                    :transform="`translate(${-(size * sqrSize + 9) / 2}, ${
-                        -(size * sqrSize + 9) / 2
-                    })`"
-                    fill="transparent"
-                    :stroke-dasharray="(size * sqrSize + 9) * 4"
-                    :stroke-width="5"
-                    :stroke-dashoffset="
-                        (size * sqrSize + 9) * 4 - progress * (size * sqrSize + 9) * 4
-                    "
+                    pathLength="1"
+                    stroke-dasharray="0 1 0"
+                    :stroke-width="3"
+                    :stroke-dashoffset="-progress"
                     :stroke="progressColor"
                 />
             </g>
@@ -200,7 +97,6 @@ import BoardNodeAction from "./BoardNodeAction.vue";
 import { coerceComponent, isCoercableComponent } from "util/vue";
 
 const sqrtTwo = Math.sqrt(2);
-const sqrSize = 1 + sqrtTwo / 2;
 
 const _props = defineProps<{
     node: BoardNode;
@@ -257,6 +153,17 @@ const position = computed(() => {
     }
     return node.position;
 });
+
+let paths = {
+    "Circle": ["M", 0, -1, "A", 1, 1, "0", "0", "1", 0, 1, "A", 1, 1, "0", "0", "1", 0, -1],
+    "Diamond": ["M", 0, -1, "L", 1, 0, "L", 0, 1, "L", -1, 0, "Z"],
+    "Square": ["M", 0, -.9, "L", .9, -.9, "L", .9, .9, "L", -.9, .9, "L", -.9, -.9, "Z"],
+    "Squircle": ["M", 0, -.95, "C", .95, -.95, .95, -.95, .95, 0, "S", .95, .95, 0, .95, "S", -.95, .95, -.95, 0, "S", -.95, -.95, 0, -.95],
+} as { [key: string]: (number | string)[] }
+
+function getPath(size: number) {
+    return paths[shape.value].map(x => typeof x == "number" ? x * size : x).join(" ");
+}
 
 const shape = computed(() => getNodeProperty(props.nodeType.value.shape, unref(props.node)));
 const title = computed(() => getNodeProperty(props.nodeType.value.title, unref(props.node)));
@@ -341,10 +248,6 @@ function mouseUp(e: MouseEvent | TouchEvent) {
 
 .progress {
     transition-duration: 0.05s;
-}
-
-.progressRing {
-    transform: rotate(-90deg);
 }
 
 .fade-enter-from,

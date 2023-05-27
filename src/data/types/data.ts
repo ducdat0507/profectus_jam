@@ -41,9 +41,12 @@ export type BuildingType = {
     baseCost: { [key: string]: number };
     upgrades: { [key: string]: BuildingUpgrade };
 
-    onUpdate?: (self: Building, loop: Loop, delta: number) => void;
-    onEnemyEnter?: (self: Building, loop: Loop, enemy: Enemy) => void;
-    onEnemyExit?: (self: Building, loop: Loop, enemy: Enemy) => void;
+    onUpdate?: (self: Building, loop: Loop, delta: number, influences: { [key: string]: number }) => void;
+    onEnemyEnter?: (self: Building, loop: Loop, enemy: Enemy, influences: { [key: string]: number }) => void;
+    onEnemyExit?: (self: Building, loop: Loop, enemy: Enemy, influences: { [key: string]: number }) => void;
+
+    progress?: (self: Building) => void;
+    influences?: (self: Building, loop: Loop) => { [key: string]: number };
 }
 
 export type BuildingUpgrade = {
@@ -58,6 +61,7 @@ export type BuildingUpgrade = {
 export type BuildingClass = 
     "damager" |
     "effector" |
+    "influencer" |
     "generator"
     
 

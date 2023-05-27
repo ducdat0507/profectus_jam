@@ -22,12 +22,13 @@ export const beamer = {
             precision: 2, unit: "s",
         },
     },
-    onUpdate(self, loop, delta) {
+    progress: self => self.data.prg,
+    onUpdate(self, loop, delta, inf) {
         if (loop.enemies.length) {
-            self.data.prg = ((self.data.prg ?? 0) as number) + delta / this.upgrades.interval.effect(self.upgrades.interval ?? 0);
+            self.data.prg = ((self.data.prg ?? 0) as number) + delta / this.upgrades.interval.effect(self.upgrades.interval ?? 0) * (inf.speed ?? 1);
             if (self.data.prg >= 1) {
                 let enm = loop.enemies[Math.floor(Math.random() * loop.enemies.length)];
-                dealDamage(enm, this.upgrades.damage.effect(self.upgrades.damage ?? 0));
+                dealDamage(enm, this.upgrades.damage.effect(self.upgrades.damage ?? 0) * (inf.damage ?? 1));
                 if (!enm[BoardConnections]) enm[BoardConnections] = {};
                 enm[BoardConnections][loop[BoardID] ?? 0] = 0;
                 self.data.prg--;
@@ -57,12 +58,13 @@ export const splatter = {
             precision: 2, unit: "s",
         },
     },
-    onUpdate(self, loop, delta) {
+    progress: self => self.data.prg,
+    onUpdate(self, loop, delta, inf) {
         if (loop.enemies.length) {
-            self.data.prg = ((self.data.prg ?? 0) as number) + delta / this.upgrades.interval.effect(self.upgrades.interval ?? 0);
+            self.data.prg = ((self.data.prg ?? 0) as number) + delta / this.upgrades.interval.effect(self.upgrades.interval ?? 0) * (inf.speed ?? 1);
             if (self.data.prg >= 1) {
                 let enm = loop.enemies[Math.floor(Math.random() * loop.enemies.length)];
-                dealDamage(enm, this.upgrades.damage.effect(self.upgrades.damage ?? 0));
+                dealDamage(enm, this.upgrades.damage.effect(self.upgrades.damage ?? 0) * (inf.damage ?? 1));
                 if (!enm[BoardConnections]) enm[BoardConnections] = {};
                 enm[BoardConnections][loop[BoardID] ?? 0] = 0;
                 self.data.prg--;
@@ -98,15 +100,16 @@ export const blaster = {
             precision: 2, unit: "s",
         },
     },
-    onUpdate(self, loop, delta) {
+    progress: self => self.data.prg,
+    onUpdate(self, loop, delta, inf) {
         if (loop.enemies.length) {
-            self.data.prg = ((self.data.prg ?? 0) as number) + delta / this.upgrades.interval.effect(self.upgrades.interval ?? 0);
+            self.data.prg = ((self.data.prg ?? 0) as number) + delta / this.upgrades.interval.effect(self.upgrades.interval ?? 0) * (inf.speed ?? 1);
             self.data.time = ((self.data.time ?? 0) as number) + delta;
             if (self.data.prg >= 1) {
                 let enm = loop.enemies[Math.floor(Math.random() * loop.enemies.length)];
                 let dam = this.upgrades.damage.effect(self.upgrades.damage ?? 0) + 
                     Math.log(self.data.time + 1) * this.upgrades.damage2.effect(self.upgrades.damage2 ?? 0);
-                dealDamage(enm, dam);
+                dealDamage(enm, dam * (inf.damage ?? 1));
                 if (!enm[BoardConnections]) enm[BoardConnections] = {};
                 enm[BoardConnections][loop[BoardID] ?? 0] = 0;
                 self.data.prg--;
@@ -131,14 +134,15 @@ export const hourglass = {
             precision: 2, unit: "s",
         },
     },
-    onUpdate(self, loop, delta) {
+    progress: self => self.data.prg,
+    onUpdate(self, loop, delta, inf) {
         if (loop.enemies.length) {
-            self.data.prg = ((self.data.prg ?? 0) as number) + delta / this.upgrades.interval.effect(self.upgrades.interval ?? 0);
+            self.data.prg = ((self.data.prg ?? 0) as number) + delta / this.upgrades.interval.effect(self.upgrades.interval ?? 0) * (inf.speed ?? 1);
             self.data.time = ((self.data.time ?? 0) as number) + delta;
             if (self.data.prg >= 1) {
                 let enm = loop.enemies[Math.floor(Math.random() * loop.enemies.length)];
                 let dam = 10 + 2 * Math.sqrt(self.data.time + 1);
-                dealDamage(enm, dam);
+                dealDamage(enm, dam * (inf.damage ?? 1));
                 if (!enm[BoardConnections]) enm[BoardConnections] = {};
                 enm[BoardConnections][loop[BoardID] ?? 0] = 0;
                 self.data.prg--;
@@ -162,8 +166,8 @@ export const plasma = {
             unit: "/s",
         },
     },
-    onUpdate(self, loop, delta) {
-        let dam = this.upgrades.damage.effect(self.upgrades.damage ?? 0);
+    onUpdate(self, loop, delta, inf) {
+        let dam = this.upgrades.damage.effect(self.upgrades.damage ?? 0) * (inf.damage ?? 1);
         for (let enm of loop.enemies) {
             dealDamage(enm, dam * delta);
             if (!enm[BoardConnections]) enm[BoardConnections] = {};
@@ -191,11 +195,12 @@ export const bomber = {
             precision: 2, unit: "s",
         },
     },
-    onUpdate(self, loop, delta) {
+    progress: self => self.data.prg,
+    onUpdate(self, loop, delta, inf) {
         if (loop.enemies.length) {
-            self.data.prg = ((self.data.prg ?? 0) as number) + delta / this.upgrades.interval.effect(self.upgrades.interval ?? 0);
+            self.data.prg = ((self.data.prg ?? 0) as number) + delta / this.upgrades.interval.effect(self.upgrades.interval ?? 0) * (inf.speed ?? 1);
             if (self.data.prg >= 1) {
-                let dam = this.upgrades.damage.effect(self.upgrades.damage ?? 0);
+                let dam = this.upgrades.damage.effect(self.upgrades.damage ?? 0) * (inf.damage ?? 1);
                 for (let enm of loop.enemies) {
                     dealDamage(enm, dam);
                     if (!enm[BoardConnections]) enm[BoardConnections] = {};
@@ -227,10 +232,11 @@ export const thunder = {
             precision: 2, unit: "s",
         },
     },
-    onUpdate(self, loop, delta) {
-        let dam = this.upgrades.damage.effect(self.upgrades.damage ?? 0);
+    progress: self => self.data.prg,
+    onUpdate(self, loop, delta, inf) {
+        let dam = this.upgrades.damage.effect(self.upgrades.damage ?? 0) * (inf.damage ?? 1);
         if (loop.enemies.length && gameLayer.resources.energy.value >= dam) {
-            self.data.prg = ((self.data.prg ?? 0) as number) + delta / this.upgrades.interval.effect(self.upgrades.interval ?? 0);
+            self.data.prg = ((self.data.prg ?? 0) as number) + delta / this.upgrades.interval.effect(self.upgrades.interval ?? 0) * (inf.speed ?? 1);
             if (self.data.prg >= 1) {
                 let enm = loop.enemies[Math.floor(Math.random() * loop.enemies.length)];
                 dealDamage(enm, dam);
@@ -252,12 +258,34 @@ export const pins = {
     description: "Deals a flat 20 damage to an enemy when one enters the loop it's on. Only has 20 uses before it vanishes. This building is not sellable and will not reverse its cost scaling when vanished.",
     baseCost: { energy: 75, },
     upgrades: {},
-    onEnemyEnter(self, loop, enemy) {
-        dealDamage(enemy, 20);
+    progress: self => 1 - (self.data.uses as number ?? 0) / 20,
+    onEnemyEnter(self, loop, enemy, inf) {
+        dealDamage(enemy, 20 * (inf.damage ?? 1));
         self.data.uses = (self.data.uses as number ?? 0) + 1;
         if (self.data.uses >= 20) delete loop.building;
         if (!enemy[BoardConnections]) enemy[BoardConnections] = {};
         enemy[BoardConnections][loop[BoardID] ?? 0] = 0;
+    },
+} as BuildingType;
+
+export const wysi = {
+    name: "When You See It",
+    icon: "👈", color: "#afafef", class: "damager",
+    description: "Deal 727 damage to ALL enemies on the board, but only when your Energy counter hits *exactly* 727. Removes itself on the board when triggered or after 727 seconds since it is placed and will not reverse its cost scaling when it does so.",
+    baseCost: { energy: 727, },
+    upgrades: {},
+    progress: self => 1 - (self.data.time as number ?? 0) / 727,
+    onUpdate(self, loop, delta, inf) {
+        self.data.time = (self.data.time as number ?? 0) + delta;
+        if (Math.floor(gameLayer.resources.energy.value) == 727) {
+            for (let loop of Object.values(gameLayer.loops.value)) {
+                for (let enm of loop.enemies) {
+                    enm.health -= 727 * (inf.damage ?? 1);
+                }
+            }
+            delete loop.building;
+        }
+        if (self.data.time >= 727) delete loop.building;
     },
 } as BuildingType;
 
@@ -274,9 +302,9 @@ export const freezer = {
             precision: 1, unit: "rad",
         },
     },
-    onEnemyExit(self, loop, enemy) {
+    onEnemyExit(self, loop, enemy, inf) {
         if (!enemy.effects.duality) delete enemy.effects.blaze;
-        enemy.effects.freeze = this.upgrades.duration.effect(self.upgrades.duration ?? 0);
+        enemy.effects.freeze = this.upgrades.duration.effect(self.upgrades.duration ?? 0) * inf.duration;
         if (!enemy[BoardConnections]) enemy[BoardConnections] = {};
         enemy[BoardConnections][loop[BoardID] ?? 0] = 0;
     },
@@ -295,9 +323,9 @@ export const igniter = {
             unit: "rad",
         },
     },
-    onEnemyEnter(self, loop, enemy) {
+    onEnemyEnter(self, loop, enemy, inf) {
         if (!enemy.effects.duality) delete enemy.effects.freeze;
-        enemy.effects.blaze = this.upgrades.duration.effect(self.upgrades.duration ?? 0);
+        enemy.effects.blaze = this.upgrades.duration.effect(self.upgrades.duration ?? 0) * inf.duration;
         if (!enemy[BoardConnections]) enemy[BoardConnections] = {};
         enemy[BoardConnections][loop[BoardID] ?? 0] = 0;
     },
@@ -316,8 +344,8 @@ export const pagoda = {
             unit: "rad",
         },
     },
-    onEnemyEnter(self, loop, enemy) {
-        enemy.effects.duality = this.upgrades.duration.effect(self.upgrades.duration ?? 0);
+    onEnemyEnter(self, loop, enemy, inf) {
+        enemy.effects.duality = this.upgrades.duration.effect(self.upgrades.duration ?? 0) * inf.duration;
         if (!enemy[BoardConnections]) enemy[BoardConnections] = {};
         enemy[BoardConnections][loop[BoardID] ?? 0] = 0;
     },
@@ -327,7 +355,7 @@ export const decayer = {
     name: "Decayer",
     icon: "☠️", color: "#cfafef", class: "effector",
     description: "Apply the \"Decay\" effect to enemies when one moves in to the loop it's on. Decaying enemies take twice as much damage.",
-    baseCost: { energy: 700, },
+    baseCost: { energy: 600, },
     upgrades: {
         duration: { 
             name: "Duration", 
@@ -336,8 +364,8 @@ export const decayer = {
             unit: "rad",
         },
     },
-    onEnemyEnter(self, loop, enemy) {
-        enemy.effects.decay = this.upgrades.duration.effect(self.upgrades.duration ?? 0);
+    onEnemyEnter(self, loop, enemy, inf) {
+        enemy.effects.decay = this.upgrades.duration.effect(self.upgrades.duration ?? 0) * inf.duration;
         if (!enemy[BoardConnections]) enemy[BoardConnections] = {};
         enemy[BoardConnections][loop[BoardID] ?? 0] = 0;
     },
@@ -356,7 +384,7 @@ export const splitter = {
             unit: "%",
         },
     },
-    onEnemyEnter(self, loop, enemy) {
+    onEnemyEnter(self, loop, enemy, inf) {
         if (Math.random() < this.upgrades.chance.effect(self.upgrades.chance ?? 0) / 100) {
             let clone: Enemy = {
                 angle: enemy.angle,
@@ -396,12 +424,143 @@ export const stablizer = {
             unit: "rad",
         },
     },
-    onEnemyEnter(self, loop, enemy) {
+    onEnemyEnter(self, loop, enemy, inf) {
         let min = this.upgrades.min.effect(self.upgrades.min ?? 0);
         if (enemy.lifetime > min) {
             enemy.lifetime = Math.max(min, enemy.lifetime - this.upgrades.amount.effect(self.upgrades.amount ?? 0));
             if (!enemy[BoardConnections]) enemy[BoardConnections] = {};
             enemy[BoardConnections][loop[BoardID] ?? 0] = 0;
+        }
+    },
+} as BuildingType;
+
+export const tachyon = {
+    name: "Tachyon",
+    icon: "⚛️", color: "#efefaf", class: "effector",
+    description: "Enemies lose stress equal to 200% of its base speed while on the loop it's on. Needs to be charged with Energy in order to work. Can only be sold for 0 Energy.",
+    baseCost: { energy: 500, },
+    upgrades: {
+        charge: { 
+            name: "Charge",
+            effect: (x) => 1 + x, 
+            cost: (x) => ({ energy: 100 }), 
+            unit: "x",
+        },
+    },
+    progress(self){
+        return ((self.upgrades.charge as number ?? 0) + 1 - (self.data.used as number ?? 0))
+    },
+    onUpdate(self, loop, delta, inf) {
+        self.sellValue = { energy: 0 };
+        let char = (self.upgrades.charge as number ?? 0) + 1;
+        if ((self.data.used as number ?? 0) < char) {
+            for (let enm of loop.enemies) {
+                let loss = Math.max(delta * 2, enm.lifetime);
+                enm.lifetime -= loss;
+                self.data.used = (self.data.used as number ?? 0) + loss / 15;
+                if (!enm[BoardConnections]) enm[BoardConnections] = {};
+                enm[BoardConnections][loop[BoardID] ?? 0] = 0;
+            }
+        }
+    },
+} as BuildingType;
+
+export const sharpener = {
+    name: "Sharpener",
+    icon: "🗡️", color: "#afafaf", class: "influencer",
+    description: "Increase the damage of adjacent Damager buildings.",
+    baseCost: { energy: 400, },
+    upgrades: {
+        factor: { 
+            name: "Factor", max: 10,
+            effect: (x) => 1.5 + x * .1, 
+            cost: (x) => ({ energy: 200 * 1.6 ** x }), 
+            precision: 1, unit: "x",
+        },
+    },
+    influences(self, loop) {
+        return {
+            damage: this.upgrades.factor.effect(self.upgrades.factor ?? 0),
+        }
+    },
+} as BuildingType;
+
+export const overclocker = {
+    name: "Overclocker",
+    icon: "⏰", color: "#efafaf", class: "influencer",
+    description: "Increase the speed of adjacent Damager buildings.",
+    baseCost: { energy: 300, },
+    upgrades: {
+        factor: { 
+            name: "Factor", max: 5,
+            effect: (x) => 1.25 + x * .05, 
+            cost: (x) => ({ energy: 200 * 2 ** x }), 
+            precision: 2, unit: "x",
+        },
+    },
+    influences(self, loop) {
+        return {
+            speed: this.upgrades.factor.effect(self.upgrades.factor ?? 0),
+        }
+    },
+} as BuildingType;
+
+export const lengthener = {
+    name: "Lengthener",
+    icon: "🫧", color: "#afcfef", class: "influencer",
+    description: "Increase the duration of adjacent Effector buildings.",
+    baseCost: { energy: 500, },
+    upgrades: {
+        factor: { 
+            name: "Factor", max: 4,
+            effect: (x) => 1.2 + x * .05, 
+            cost: (x) => ({ energy: 200 * 2.4 ** x }), 
+            precision: 2, unit: "x",
+        },
+    },
+    influences(self, loop) {
+        return {
+            duration: this.upgrades.factor.effect(self.upgrades.factor ?? 0),
+        }
+    },
+} as BuildingType;
+
+export const synthesizer = {
+    name: "Synthesizer",
+    icon: "🧬", color: "#cfafef", class: "influencer",
+    description: "Increase the gain amount of adjacent Generator buildings.",
+    baseCost: { energy: 600, },
+    upgrades: {
+        factor: { 
+            name: "Factor", max: 5,
+            effect: (x) => 1.5 + x * .1, 
+            cost: (x) => ({ energy: 300 * 1.6 ** x }), 
+            precision: 1, unit: "x",
+        },
+    },
+    influences(self, loop) {
+        return {
+            amount: this.upgrades.factor.effect(self.upgrades.factor ?? 0),
+        }
+    },
+} as BuildingType;
+
+export const expander = {
+    name: "Expander",
+    icon: "🔳", color: "#cfcfcf", class: "influencer",
+    description: "Increase the threshold of adjacent Generator buildings.",
+    baseCost: { energy: 500, },
+    upgrades: {
+        factor: { 
+            name: "Factor", max: 5,
+            effect: (x) => 1.25 + x * .05, 
+            cost: (x) => ({ energy: 300 * 2 ** x }), 
+            precision: 2, unit: "x",
+        },
+    },
+    influences(self, loop) {
+        return {
+            threshold: this.upgrades.factor.effect(self.upgrades.factor ?? 0),
         }
     },
 } as BuildingType;
@@ -419,8 +578,8 @@ export const energizer = {
             unit: "/rad",
         },
     },
-    onUpdate(self, loop, delta) {
-        let dam = this.upgrades.amount.effect(self.upgrades.amount ?? 0);
+    onUpdate(self, loop, delta, inf) {
+        let dam = this.upgrades.amount.effect(self.upgrades.amount ?? 0) * (inf.amount ?? 1);
         for (let enm of loop.enemies) {
             enm.loot.energy = (enm.loot.energy ?? 0) + (dam * delta * Math.abs(enm.speed));
             if (!enm[BoardConnections]) enm[BoardConnections] = {};
@@ -433,7 +592,7 @@ export const multiplier = {
     name: "Multiplier",
     icon: "✖️", color: "#efefaf", class: "generator",
     description: "When an enemy enters the loop its on, if an enemy's Energy drop is in a certain threshold or below, double the Energy drop.",
-    baseCost: { energy: 800, },
+    baseCost: { energy: 600, },
     upgrades: {
         threshold: { 
             name: "Threshold", 
@@ -441,8 +600,8 @@ export const multiplier = {
             cost: (x) => ({ energy: 500 * 3 ** x }), 
         },
     },
-    onEnemyEnter(self, loop, enemy) {
-        let min = this.upgrades.threshold.effect(self.upgrades.threshold ?? 0);
+    onEnemyEnter(self, loop, enemy, inf) {
+        let min = this.upgrades.threshold.effect(self.upgrades.threshold ?? 0) * (inf.threshold ?? 1);
         if (enemy.loot.energy <= min) {
             enemy.loot.energy *= 2;
             if (!enemy[BoardConnections]) enemy[BoardConnections] = {};
@@ -464,12 +623,34 @@ export const observer = {
             unit: "/s",
         },
     },
-    onUpdate(self, loop, delta) {
-        let dam = this.upgrades.amount.effect(self.upgrades.amount ?? 0);
+    onUpdate(self, loop, delta, inf) {
+        let dam = this.upgrades.amount.effect(self.upgrades.amount ?? 0) * (inf.amount ?? 1);
         for (let enm of loop.enemies) {
             enm.loot.info = (enm.loot.info ?? 0) + (dam * delta);
             if (!enm[BoardConnections]) enm[BoardConnections] = {};
             enm[BoardConnections][loop[BoardID] ?? 0] = 0;
+        }
+    },
+} as BuildingType;
+
+export const thinker = {
+    name: "The Thinker",
+    icon: "🤔", color: "#efafcf", class: "generator",
+    description: "When an enemy enters the loop its on, if an enemy's Info drop is in a certain threshold or below, double the Info drop.",
+    baseCost: { energy: 500, },
+    upgrades: {
+        threshold: { 
+            name: "Threshold", 
+            effect: (x) => 100 + 50 * x, 
+            cost: (x) => ({ energy: 200 * 3 ** x }), 
+        },
+    },
+    onEnemyEnter(self, loop, enemy, inf) {
+        let min = this.upgrades.threshold.effect(self.upgrades.threshold ?? 0) * (inf.threshold ?? 1);
+        if (enemy.loot.info <= min) {
+            enemy.loot.info *= 2;
+            if (!enemy[BoardConnections]) enemy[BoardConnections] = {};
+            enemy[BoardConnections][loop[BoardID] ?? 0] = 0;
         }
     },
 } as BuildingType;

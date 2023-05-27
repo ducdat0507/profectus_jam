@@ -46,8 +46,9 @@ export enum ProgressDisplay {
 /** Node shapes. */
 export enum Shape {
     Circle = "Circle",
-    Diamond = "Triangle",
-    Square = "Square"
+    Diamond = "Diamond",
+    Square = "Square",
+    Squircle = "Squircle",
 }
 
 /** An object representing a node on the board. */

@@ -106,15 +106,18 @@ ul {
 	transition: none;
 }
 
+.game-board .building {
+	pointer-events: none;
+}
 .game-board .building .body {
     stroke: #0000001f;
-	pointer-events: none;
 	stroke-width: 8;
 	transition: none;
 }
 .game-board .building .node-title {
 	fill: black;
 	font-family: "Noto Emoji";
+	font-weight: normal;
 	filter: drop-shadow(0 0 8px #f7f8ff);
 	transform: translateY(3.2px);
 }
@@ -268,6 +271,7 @@ ul {
 .action-list button .icon {
 	line-height: 24px;
 	margin: 0 0 2px 0;
+	font-weight: normal;
 }
 
 .action-list button + button {
@@ -354,6 +358,7 @@ ul {
 	line-height: 24px;
 	margin: 0 0 2px 0;
 	transition: none;
+	font-weight: normal;
 }
 
 .building-list button + button {
@@ -371,6 +376,13 @@ ul {
 	transform: rotate(-45deg);
 	margin: 0 2px 2px 0;
 }
+
+.building-list button.influencer .background {
+	width: 45px;
+	height: 45px;
+	border-radius: 25%;
+}
+
 
 .building-list button.generator .background {
 	width: 42px;

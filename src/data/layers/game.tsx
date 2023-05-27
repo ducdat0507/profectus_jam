@@ -92,7 +92,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
         stress: createRepeatable(self => ({
             display: jsx(() => <>
                 Level {formatWhole(self.amount.value)}<br/>
-                <h3>Stress</h3>
+                <h3>Stress Tolerance</h3>
                 <hr/>
                 &uarr; {formatWhole(Decimal.add(self.amount.value, 101))}% &uarr;<br/>
                 {formatWhole(Decimal.add(self.amount.value, 100))}%<br/>
@@ -101,7 +101,22 @@ const layer = createLayer(id, function (this: BaseLayer) {
             </>),
             requirements: createCostRequirement(() => ({
                 resource: noPersist(resources.info),
-                cost: Formula.variable(self.amount).pow_base(1.1).mul(100),
+                cost: Formula.variable(self.amount).pow_base(1.1).mul(50),
+            })),
+        })),
+        energy: createRepeatable(self => ({
+            display: jsx(() => <>
+                Level {formatWhole(self.amount.value)}<br/>
+                <h3>Enemy Base Energy</h3>
+                <hr/>
+                &uarr; {formatWhole(Decimal.add(self.amount.value, 26))} &uarr;<br/>
+                {formatWhole(Decimal.add(self.amount.value, 25))}<br/>
+                <hr/>
+                {displayRequirements(upgrades.energy.requirements)}
+            </>),
+            requirements: createCostRequirement(() => ({
+                resource: noPersist(resources.info),
+                cost: Formula.variable(self.amount).pow_base(1.15).mul(50),
             })),
         })),
     } as Record<string, GenericRepeatable>;
@@ -224,8 +239,6 @@ const layer = createLayer(id, function (this: BaseLayer) {
         count = Math.floor(count) + (Math.random() < (count % 1) ? 1 : 0);
         let loopList = Object.values(loops.value);
         if (loopList.length <= 0) return;
-
-        resources.info.value = +resources.info.value;
         
         let enemyFactor: number = 1;
         switch (main.selectedGameMode.value) {
@@ -233,25 +246,43 @@ const layer = createLayer(id, function (this: BaseLayer) {
                 enemyFactor = 1;
                 break;
             case "boosted":
-                enemyFactor = 2;
+                enemyFactor = 1.1;
                 break;
             case "hardcore":
-                enemyFactor = 3;
+                enemyFactor = 1.2;
                 break;
         }
 
         for (let a = 0; a < count; a++) {
-            let health = 18 * (1.05 ** (cycle.value * enemyFactor)) * (Math.random() * .2 + .9);
+            let health = 18 * (1.05 ** (cycle.value ** enemyFactor)) * (Math.random() * .2 + .9);
             loopList[Math.floor(Math.random() * loopList.length)].enemies.push({
                 angle: Math.random(),
                 lifetime: 0,
-                speed: (Math.random() * .4 + .8 + 0.05 * cycle.value) * (Math.random() < .5 ? 1 : -1),
+                speed: (Math.random() * .4 + .8 + 0.05 * cycle.value * enemyFactor) * (Math.random() < .5 ? 1 : -1),
                 health,
                 maxHealth: health,
                 effects: {},
-                loot: { energy: 25 },
+                loot: { energy: Decimal.add(25, upgrades.energy.amount.value).toNumber() },
             });
         }
+    }
+    
+    function getInfluence(id: string) {
+        let { x, y } = loopIdToPosition(id);
+
+        let flu: Record<string, number> = {};
+
+        for (let [ dx, dy ] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            let loop = loops.value[loopPositionToId(x + dx, y + dy)];
+            let f = null;
+            if (loop?.building && (f = buildings[loop.building.type].influences?.(loop.building, loop))) {
+                for (let attr in f) {
+                    flu[attr] = (flu[attr] ?? 1) * f[attr];
+                }
+            }
+        }
+        
+        return flu;
     }
 
     function spawnLoop() {
@@ -332,11 +363,14 @@ const layer = createLayer(id, function (this: BaseLayer) {
                     }, 3000);
                 }
             }
+            if (Math.floor(resources.energy.value) == 727) {
+                main.objectives.value.wysi = main.objectives.value.wysi ?? 0;
+            }
     
             let enemyMoves: {
                 enemy: Enemy;
-                from: Loop;
-                to: Loop;
+                from: string;
+                to: string;
             }[] = [];
     
             stress.value = 0;
@@ -365,7 +399,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
                     if (enm.health <= 0) {
                         loop.enemies.splice(loop.enemies.indexOf(enm), 1);
                         for (let [id, loot] of Object.entries(enm.loot)) {
-                            resources[id].value += loot;
+                            resources[id].value = Decimal.add(resources[id].value, loot).toNumber();
                         }
                     }
         
@@ -374,8 +408,8 @@ const layer = createLayer(id, function (this: BaseLayer) {
                         if (loops.value[loopPositionToId(x, y + 1)] && Math.random() < 0.5) {
                             enemyMoves.push({
                                 enemy: enm,
-                                from: loops.value[loopPositionToId(x, y)],
-                                to: loops.value[loopPositionToId(x, y + 1)],
+                                from: loopPositionToId(x, y),
+                                to: loopPositionToId(x, y + 1),
                             });
                             enm.angle = 0.5 - enm.angle;
                             enm.speed = -enm.speed;
@@ -386,8 +420,8 @@ const layer = createLayer(id, function (this: BaseLayer) {
                         if (loops.value[loopPositionToId(x + 1, y)] && Math.random() < 0.5) {
                             enemyMoves.push({
                                 enemy: enm,
-                                from: loops.value[loopPositionToId(x, y)],
-                                to: loops.value[loopPositionToId(x + 1, y)],
+                                from: loopPositionToId(x, y),
+                                to: loopPositionToId(x + 1, y),
                             });
                             enm.angle = 1 - enm.angle;
                             enm.speed = -enm.speed;
@@ -398,8 +432,8 @@ const layer = createLayer(id, function (this: BaseLayer) {
                         if (loops.value[loopPositionToId(x, y - 1)] && Math.random() < 0.5) {
                             enemyMoves.push({
                                 enemy: enm,
-                                from: loops.value[loopPositionToId(x, y)],
-                                to: loops.value[loopPositionToId(x, y - 1)],
+                                from: loopPositionToId(x, y),
+                                to: loopPositionToId(x, y - 1),
                             });
                             enm.angle = 0.5 - enm.angle;;
                             enm.speed = -enm.speed;
@@ -410,8 +444,8 @@ const layer = createLayer(id, function (this: BaseLayer) {
                         if (loops.value[loopPositionToId(x - 1, y)] && Math.random() < 0.5) {
                             enemyMoves.push({
                                 enemy: enm,
-                                from: loops.value[loopPositionToId(x, y)],
-                                to: loops.value[loopPositionToId(x - 1, y)],
+                                from: loopPositionToId(x, y),
+                                to: loopPositionToId(x - 1, y),
                             });
                             enm.angle = 1 - enm.angle;
                             enm.speed = -enm.speed;
@@ -432,11 +466,11 @@ const layer = createLayer(id, function (this: BaseLayer) {
                 }
     
                 if (loop.building) {
-                    buildings[loop.building.type].onUpdate?.(loop.building, loop, delta);
+                    buildings[loop.building.type].onUpdate?.(loop.building, loop, delta, getInfluence(id));
                 }
             }
     
-            stress.value /= Object.values(loops.value).length * 10;
+            stress.value /= Object.values(loops.value).length * 10 * Decimal.div(upgrades.stress.amount.value, 100).add(1).toNumber();
     
             if (stress.value > 1) {
                 health.value -= (2 ** stress.value) * delta;
@@ -449,14 +483,17 @@ const layer = createLayer(id, function (this: BaseLayer) {
             }
             
             for (let move of enemyMoves) {
-                move.from.enemies.splice(move.from.enemies.indexOf(move.enemy), 1);
-                move.to.enemies.push(move.enemy);
+                let from = loops.value[move.from];
+                let to = loops.value[move.to];
+
+                from.enemies.splice(from.enemies.indexOf(move.enemy), 1);
+                to.enemies.push(move.enemy);
     
-                if (move.from.building) {
-                    buildings[move.from.building.type].onEnemyExit?.(move.from.building, move.from, move.enemy);
+                if (from.building) {
+                    buildings[from.building.type].onEnemyExit?.(from.building, from, move.enemy, getInfluence(move.from));
                 }
-                if (move.to.building) {
-                    buildings[move.to.building.type].onEnemyEnter?.(move.to.building, move.to, move.enemy);
+                if (to.building) {
+                    buildings[to.building.type].onEnemyEnter?.(to.building, to, move.enemy, getInfluence(move.to));
                 }
             }
     
@@ -478,8 +515,9 @@ const layer = createLayer(id, function (this: BaseLayer) {
                                 resources[id].value -= realCost;
                                 loop.building.sellValue[id] = realCost * 0.75;
                             }
-                            for (let enm of loop.enemies) {
-                                buildings[selectedBuilding.value].onEnemyEnter?.(loop.building as Building, loop, enm);
+                            let id = Object.entries(loops.value).find(x => x[1] == loop)?.[0];
+                            if (id) for (let enm of loop.enemies) {
+                                buildings[selectedBuilding.value].onEnemyEnter?.(loop.building as Building, loop, enm, getInfluence(id));
                             }
                             buildingFactor.value++;
                             buildingFactors.value[selectedBuilding.value] = (buildingFactors.value[selectedBuilding.value] ?? 0) + 1;
@@ -924,8 +962,10 @@ const layer = createLayer(id, function (this: BaseLayer) {
                             </div> : <span class="bar-label">
                                 Select a building to build &rarr;
                             </span>}
-                        </div> : Decimal.gt(resourcesTotal.info.value, 0) ? <div class="building-upgrades" style="--layer-color: #afcfef">
-                            {Object.values(upgrades).map(render)}
+                        </div> : Decimal.gt(resourcesTotal.info.value, 0) ? <div style="display: flex; height: 31px">
+                            <div class="building-upgrades" style="--layer-color: #afcfef">
+                                {Object.values(upgrades).map(render)}
+                            </div>
                         </div> : ""}
                         <div style="display: flex; height: 31px">
                             <span>
@@ -954,7 +994,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
 
                         { main.selectedGameMode.value == "hardcore" ? "" : <>
                             {Decimal.gte(main.upgrades.speedManip.amount.value, 1) ? <>
-                                <button class="action speed" onClick={() => gameSpeed.value = 0}>
+                                <button class="action speed" onClick={() => gameSpeed.value = 0.000001}>
                                     <div class="background">
                                         <div class="icon">
                                             ⏸️
@@ -1063,7 +1103,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
                                             main.points.value = Decimal.add(main.points.value, xpWorth.value).toNumber();
                                             endGameModalShown.value = false;
                                             startGame();
-                                        }, 6001);
+                                        }, 6010);
                                         endGame();
                                         gamePaused.value = false;
                                     }}
@@ -1078,7 +1118,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
                                             gameState.value = GameState.Idle;
                                             endGameModalShown.value = false;
                                             player.tabs = ["main"];
-                                        }, 6001);
+                                        }, 6010);
                                         endGame();
                                         gamePaused.value = false;
                                     }}

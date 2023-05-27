@@ -13,7 +13,7 @@ import Decimal, { format, formatTime } from "util/bignum";
 import { render } from "util/vue";
 import { computed, ref, toRaw } from "vue";
 import gameLayer from "./layers/game";
-import { BoardNode, GenericBoard, Shape, createBoard } from "features/boards/board";
+import { BoardNode, GenericBoard, ProgressDisplay, Shape, createBoard } from "features/boards/board";
 import { Persistent, noPersist, persistent } from "game/persistence";
 import InfoVue from "components/Info.vue";
 import OptionsVue from "components/Options.vue";
@@ -27,6 +27,7 @@ import { GenericUpgrade, createUpgrade } from "features/upgrades/upgrade";
 import { createCostRequirement } from "game/requirements";
 import Formula from "game/formulas/formulas";
 import { GenericRepeatable, createRepeatable } from "features/repeatable";
+import layer from "./layers/game";
 
 const buildings = b as { [key: string]: BuildingType };
 
@@ -184,6 +185,13 @@ export const main = createLayer("main", function (this: BaseLayer) {
             style: { width: "225px", padding: "0 10px" },
         })),
     } as Record<string, GenericRepeatable>;
+    
+
+    const stats = {
+        bestEnergy: trackBest(gameLayer.resourcesTotal.energy),
+        bestInfo: trackBest(gameLayer.resourcesTotal.info),
+        bestTime: trackBest(gameLayer.lifetime),
+    }
 
     let objectives = persistent<Record<string, number>>({});
 
@@ -195,7 +203,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             description: "Reach Cycle {0} in Standard mode.",
             target: noPersist(bestCycle.standard),
             goal: (x) => 10 + x * 5,
-            reward: (x) => ["xp", 10 + x * (x + 1) * .5],
+            reward: (x) => ["xp", 10 + x * (x + 1) * (x + 2) / 6],
             exclusiveRewards: {
                 3: ["building", "splatter"],
                 6: ["building", "blaster"],
@@ -208,7 +216,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             description: "Reach Cycle {0} in Boosted mode.",
             target: noPersist(bestCycle.boosted),
             goal: (x) => 10 + x * 5,
-            reward: (x) => ["xp", 12 + x * (x + 1)],
+            reward: (x) => ["xp", 12 + x * (x + 1) * (x + 2) / 3],
             exclusiveRewards: {
                 2: ["building", "bomber"],
                 4: ["building", "hourglass"],
@@ -220,7 +228,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             description: "Reach Cycle {0} in Hardcore mode.",
             target: noPersist(bestCycle.hardcore),
             goal: (x) => 10 + x * 5,
-            reward: (x) => ["xp", 15 + x * (x + 1) * 1.5],
+            reward: (x) => ["xp", 15 + x * (x + 1) * (x + 2) / 2],
             exclusiveRewards: {
                 1: ["building", "igniter"],
                 3: ["building", "pagoda"],
@@ -234,16 +242,59 @@ export const main = createLayer("main", function (this: BaseLayer) {
             reward: (x) => ["capsules", 3 + x],
             exclusiveRewards: {
                 3: ["building", "observer"],
+                5: ["building", "overclocker"],
+                7: ["building", "sharpener"],
+            }
+        },
+        capsuleCount: {
+            name: "Is This P2W?",
+            description: "Open {0} 💊.",
+            target: computed(() => Object.values(allocatedCapsules.value).reduce((x, y) => x + y, 0)),
+            goal: (x) => 10 + x * 4 + x * (x + 1) / 2,
+            reward: (x) => ["xp", 50 + x * 4 + x * (x + 1) * (x + 2) / 6],
+            exclusiveRewards: {
+                3: ["building", "synthesizer"],
+                6: ["building", "expander"],
             }
         },
         totalXP: {
-            name: "XP Grinder",
+            name: "Look how much you've grown!",
             description: "Gain a total of {0} XP.",
             target: noPersist(total),
             goal: (x) => 500 + x * (x + 1) * (x + 2) * 250,
             reward: (x) => ["capsules", 3],
             exclusiveRewards: {
-                6: ["building", "multiplier"],
+                3: ["building", "lengthener"],
+            }
+        },
+        bestEnergy: {
+            name: "Power Player",
+            description: "Reach a best total Energy of {0}.",
+            target: noPersist(stats.bestEnergy),
+            goal: (x) => 10000 + x * (x + 1) * (x + 2) * 500,
+            reward: (x) => ["xp", 20 + x * (x + 1) * (x + 2) * 1.5],
+            exclusiveRewards: {
+                3: ["building", "multiplier"],
+            }
+        },
+        bestInfo: {
+            name: "Knowledged Looper",
+            description: "Reach a best total Information of {0}.",
+            target: noPersist(stats.bestInfo),
+            goal: (x) => 1000 + x * (x + 1) * (x + 2) * 50,
+            reward: (x) => ["xp", 40 + x * (x + 1) * (x + 2) * 2.5],
+            exclusiveRewards: {
+                3: ["building", "thinker"],
+            }
+        },
+        bestTime: {
+            name: "Marathoner",
+            description: "Have a {0} seconds long game.",
+            target: noPersist(stats.bestTime),
+            goal: (x) => 300 + x * 80 + x * x * 20,
+            reward: (x) => ["xp", 40 + x * (x + 1) * (x + 2) * 2.5],
+            exclusiveRewards: {
+                3: ["building", "tachyon"],
             }
         },
     } as Record<string, Objective>;
@@ -251,13 +302,18 @@ export const main = createLayer("main", function (this: BaseLayer) {
     let specialObjectives = {
         anxiety: {
             name: "Anxiety",
-            description: "Reach 200% stress.",
+            description: "Reach a stress level of 200%.",
             reward: ["building", "stablizer"],
         },
         stucked: {
             name: "Stucked",
-            description: "Get yourself in a \"softlocked\" state.",
+            description: "Get yourself into a \"softlocked\" state.",
             reward: ["building", "pins"],
+        },
+        wysi: {
+            name: "All-Seeing",
+            description: "Have *exactly* 727 Energy at some point.",
+            reward: ["building", "wysi"],
         },
     } as Record<string, SpecialObjective>;
     
@@ -291,6 +347,25 @@ export const main = createLayer("main", function (this: BaseLayer) {
     function getCapsuleEffect(id: string) {
         return capsuleUpgrades[id].formula(allocatedCapsules.value[id] ?? 0);
     }
+
+    globalBus.on("onLoad", () => {
+        for (let [id, obj] of Object.entries(normalObjectives)) {
+            for (let [goal, exc] of Object.entries(obj.exclusiveRewards)) {
+                if ((objectives.value[id] ?? 0) > +goal) {
+                    if (exc[0] == "building") {
+                        unlockedBuildings.value[exc[1]] = true;
+                    }
+                }
+            }
+        }
+        for (let [id, obj] of Object.entries(specialObjectives)) {
+            if ((objectives.value[id] ?? 0) >= 1) {
+                if (obj.reward[0] == "building") {
+                    unlockedBuildings.value[obj.reward[1]] = true;
+                }
+            }
+        }
+    })
 
     const board = createBoard(() => ({
         startNodes: () => [],
@@ -1088,6 +1163,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
         timeSinceLastClaim,
         
         bestCycle,
+        stats,
 
         hubState,
         selectedGameMode,
@@ -1143,7 +1219,7 @@ export const getInitialLayers = (
  * A computed ref whose value is true whenever the game is over.
  */
 export const hasWon = computed(() => {
-    return false;
+    return Object.keys(main.unlockedBuildings.value).length >= Object.keys(buildings).length;
 });
 
 /**
@@ -1156,5 +1232,6 @@ export function fixOldSave(
     oldVersion: string | undefined,
     player: Partial<Player>
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-): void {}
+): void {
+}
 /* eslint-enable @typescript-eslint/no-unused-vars */
