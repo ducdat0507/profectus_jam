@@ -339,7 +339,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
             let isStucked = true;
             for (let loop of Object.values(loops.value)) {
                 hasEnemies ||= loop.enemies.length > 0;
-                isStucked &&= !loop.building || buildings[loop.building.type].class != "damager";
+                isStucked &&= !loop.building;
             }
             if (!hasEnemies) {
                 cycleProgress.value = 0;
