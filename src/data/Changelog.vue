@@ -5,13 +5,19 @@
         </template>
         <template v-slot:body>
             <details open>
+                <summary>v0.2.1 Slightly Less Prototypey Thing - <time>2023-05-26</time></summary>
+                <ul>
+                    <li class="fix">Fix breaking error</li>
+                </ul>
+            </details>
+            <details>
                 <summary>v0.2 Slightly Less Prototypey Thing - <time>2023-05-26</time></summary>
                 <ul>
                     <li class="feature">Added the meta game</li>
                     <li class="feature">Added more buildings</li>
                 </ul>
             </details>
-            <details open>
+            <details>
                 <summary>v0.1 Prototype Thing - <time>2023-05-25</time></summary>
                 This is the first release :D
                 <ul>

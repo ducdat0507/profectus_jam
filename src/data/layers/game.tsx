@@ -970,7 +970,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
                                 </button>
                             </> : ""}
                             {
-                                [...Array(new Decimal(main.upgrades.speedManip.amount.value).max(0).toNumber() - 1).keys()].map((x) => 
+                                [...Array(Decimal.sub(main.upgrades.speedManip.amount.value, 1).max(0).toNumber()).keys()].map((x) => 
                                     <button class="action speed" onClick={() => gameSpeed.value = x + 2}>
                                         <div class="background">
                                             <div class="icon">
