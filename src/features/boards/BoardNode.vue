@@ -247,7 +247,7 @@ function mouseUp(e: MouseEvent | TouchEvent) {
 }
 
 .progress {
-    transition-duration: 0.05s;
+    transition-duration: 0s;
 }
 
 .fade-enter-from,

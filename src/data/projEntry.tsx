@@ -50,7 +50,7 @@ export let gameModes = {
     },
     boosted: {
         name: "Boosted",
-        description: "Harder enemies.\nLess health.",
+        description: "Harder enemies.\nFaster health drain.",
         multiplier: 1.5
     },
     hardcore: {
@@ -108,7 +108,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             limit: 9,
             requirements: createCostRequirement(() => ({
                 resource: noPersist(points),
-                cost: Formula.variable(self.amount).pow_base(1.5).mul(200).sub(200),
+                cost: Formula.variable(self.amount).pow_base(1.3).mul(200).sub(200),
             })),
             style: { width: "225px", padding: "0 10px" },
         })),
@@ -122,7 +122,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             limit: 8,
             requirements: createCostRequirement(() => ({
                 resource: noPersist(points),
-                cost: Formula.variable(self.amount).pow_base(2).mul(300),
+                cost: Formula.variable(self.amount).pow_base(1.6).mul(300),
             })),
             style: { width: "225px", padding: "0 10px" },
         })),
@@ -138,7 +138,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             limit: 4,
             requirements: createCostRequirement(() => ({
                 resource: noPersist(points),
-                cost: Formula.variable(self.amount).pow_base(5).mul(200),
+                cost: Formula.variable(self.amount).pow_base(3).mul(200),
             })),
             style: { width: "225px", padding: "0 10px" },
         })),
@@ -152,7 +152,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             limit: 10,
             requirements: createCostRequirement(() => ({
                 resource: noPersist(points),
-                cost: Formula.variable(self.amount).pow_base(1.5).mul(200),
+                cost: Formula.variable(self.amount).pow_base(1.4).mul(200),
             })),
             style: { width: "225px", padding: "0 10px" },
         })),
@@ -218,9 +218,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
             goal: (x) => 10 + x * 5,
             reward: (x) => ["xp", 12 + x * (x + 1) * (x + 2) / 3],
             exclusiveRewards: {
-                2: ["building", "bomber"],
-                4: ["building", "hourglass"],
-                6: ["building", "decayer"],
+                3: ["building", "bomber"],
+                6: ["building", "hourglass"],
+                9: ["building", "decayer"],
             }
         },
         hardcoreCycle: {
@@ -230,8 +230,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
             goal: (x) => 10 + x * 5,
             reward: (x) => ["xp", 15 + x * (x + 1) * (x + 2) / 2],
             exclusiveRewards: {
-                1: ["building", "igniter"],
-                3: ["building", "pagoda"],
+                3: ["building", "igniter"],
+                6: ["building", "pagoda"],
             }
         },
         upgradeCount: {
@@ -239,7 +239,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             description: "Buy {0} Researches.",
             target: computed(() => Object.values(upgrades).reduce((x, y) => Decimal.add(x, y.amount.value).toNumber(), 0)),
             goal: (x) => 3 + x * 2,
-            reward: (x) => ["capsules", 3 + x],
+            reward: (x) => ["capsules", Math.floor(3 + x / 2)],
             exclusiveRewards: {
                 3: ["building", "observer"],
                 5: ["building", "overclocker"],
@@ -250,11 +250,13 @@ export const main = createLayer("main", function (this: BaseLayer) {
             name: "Is This P2W?",
             description: "Open {0} 💊.",
             target: computed(() => Object.values(allocatedCapsules.value).reduce((x, y) => x + y, 0)),
-            goal: (x) => 10 + x * 4 + x * (x + 1) / 2,
+            goal: (x) => 10 + x * 4 + x * (x + 1) / 2 + Math.floor(x * x * x  / 32),
             reward: (x) => ["xp", 50 + x * 4 + x * (x + 1) * (x + 2) / 6],
             exclusiveRewards: {
                 3: ["building", "synthesizer"],
                 6: ["building", "expander"],
+                9: ["building", "winderR"],
+                12: ["building", "antiwinder"],
             }
         },
         totalXP: {
@@ -285,6 +287,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             reward: (x) => ["xp", 40 + x * (x + 1) * (x + 2) * 2.5],
             exclusiveRewards: {
                 3: ["building", "thinker"],
+                5: ["building", "turtle"],
             }
         },
         bestTime: {
@@ -292,9 +295,22 @@ export const main = createLayer("main", function (this: BaseLayer) {
             description: "Have a {0} seconds long game.",
             target: noPersist(stats.bestTime),
             goal: (x) => 300 + x * 80 + x * x * 20,
-            reward: (x) => ["xp", 40 + x * (x + 1) * (x + 2) * 2.5],
+            reward: (x) => ["xp", 40 + x * (x + 1) * (x + 2)],
             exclusiveRewards: {
                 3: ["building", "tachyon"],
+                6: ["building", "snail"],
+            }
+        },
+        meta: {
+            name: "Very Creative Objective",
+            description: "Complete {0} Objectives.",
+            target: computed(() => Object.values(objectives.value).reduce((x, y) => x + y, 0)),
+            goal: (x) => 20 + x * 4 + x * (x + 1) / 2,
+            reward: (x) => ["capsules", Math.floor(3 + x / 3)],
+            exclusiveRewards: {
+                2: ["building", "xray"],
+                5: ["building", "winderL"],
+                8: ["building", "winder"],
             }
         },
     } as Record<string, Objective>;
@@ -590,7 +606,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             <h2 style="font-style: italic;">
                 - Equip your buildings. -
             </h2>
-            <div class="building-list collection" style="border-bottom: 2px solid var(--foreground); padding-bottom: 20px; transition: none">
+            <div class="building-list collection" style="flex-wrap: nowrap; overflow-x: auto; width: 100%; margin-bottom: 20px; transition: none">
                 {
                     selectedBuildings.value.map((id) => {
                         let building = buildings[id];
@@ -622,6 +638,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     [...Array(slots - selectedBuildings.value.length).keys()].map(() => <button class="disabled">a</button>)
                 }
             </div>
+            <hr style="background: var(--foreground); opacity: 1" />
         </>;
         hubModalContent.value = () => {
             return <>
@@ -670,8 +687,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     <br />
                     <i>{buildings[focusedBuilding.value].description}</i>
                 </div>
-                <div style="flex: 0 0 calc(50% - 5px); margin: 5px 0 5px 0">
-                <h5>BASE BUILDING COST:</h5>
+                <div style="flex: 0 0 calc(50% - 5px); margin: 0">
+                    <h5>BASE BUILDING COST:</h5>
                     <div class="stat-entries">
                         {Object.entries(buildings[focusedBuilding.value].baseCost).map(([id, cost]) => 
                             <div>
@@ -694,6 +711,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             </div> : <div style="text-align: center; font-style: italic;">
                 Click on a building to view its details.
             </div>}
+            <hr style="opacity: 0; margin: 3px" />
             <div style="display: flex; text-align: center; --layer-color: #dadafa">
                 <button
                     class="feature can"
@@ -797,8 +815,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     <br />
                     <i>{buildings[focusedBuilding.value].description}</i>
                 </div>
-                <div style="flex: 0 0 calc(50% - 5px); margin: 5px 0 5px 0">
-                <h5>BASE BUILDING COST:</h5>
+                <div style="flex: 0 0 calc(50% - 5px); margin: 0">
+                    <h5>BASE BUILDING COST:</h5>
                     <div class="stat-entries">
                         {Object.entries(buildings[focusedBuilding.value].baseCost).map(([id, cost]) => 
                             <div>
@@ -821,6 +839,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             </div> : unlocks.collection.value ? <div style="text-align: center; font-style: italic;">
                 Click on a building to view its details.
             </div> : ""}
+            <hr style="opacity: 0; margin: 3px" />
             <div style="display: flex; text-align: center; --layer-color: #dadafa">
                 <div style="flex-grow: 1" />
                 <button
@@ -1065,8 +1084,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
         </>;
         hubModalContent.value = () => {
             let cost = 1;
-            let interval = 3600 / (100 + getCapsuleEffect("capsules")) / (100 + new Decimal(upgrades.capsuleGain.amount.value).toNumber()) * 10000;
-            let capacity = 10 + getCapsuleEffect("capacity") + new Decimal(upgrades.capsuleCap.amount.value).toNumber();
+            let interval = 900 / (100 + getCapsuleEffect("capsules")) / (100 + new Decimal(upgrades.capsuleGain.amount.value).toNumber()) * 10000;
+            let capacity = 20 + getCapsuleEffect("capacity") + new Decimal(upgrades.capsuleCap.amount.value).toNumber();
             let amount = Math.min((player.time - timeSinceLastClaim.value) / interval / 1000, capacity);
             return !unlocks.capsules.value ? <div style="text-align: center; --layer-color: #afcfef">
                 <button 
@@ -1114,8 +1133,12 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     Open 1 💊
                 </button>
                 <hr/><br/>
-                You have <h2>{format(amount, 3)} / {format(capacity, 2)}</h2> unclaimed 💊.<br/>
-                You gain 1 💊 every {formatTime(interval)}.
+                You have <h2>{format(amount, 2)} / {format(capacity, 2)}</h2> unclaimed 💊.<br/>
+                You gain 1 💊 every {formatTime(interval)}.<br/>
+                ({amount >= capacity 
+                    ? "Your 💊 is full, claim them now!" 
+                    : "Full after " + formatTime((capacity - amount) * interval)
+                })
                 <hr/>
                 <button 
                     class={{feature: true, can: amount >= 1}} 

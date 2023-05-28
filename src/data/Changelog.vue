@@ -5,6 +5,15 @@
         </template>
         <template v-slot:body>
             <details open>
+                <summary>v0.4 this game isn't that great tbh - <time>2023-05-28</time></summary>
+                <ul>
+                    <li class="feature">Added new buildings</li>
+                    <li class="changed">Adjusted enemies' health formula</li>
+                    <li class="changed">Changed how game modes affect health</li>
+                    <li class="changed">Style polishments</li>
+                </ul>
+            </details>
+            <details open>
                 <summary>v0.3 Lesser Prototypey Thing - <time>2023-05-27</time></summary>
                 <ul>
                     <li class="feature">Added new building type - Influencer</li>
@@ -32,7 +41,7 @@
                     <li class="feature">Did everything</li>
                     <li class="fix">Had some fun</li>
                     <li class="breaking">Removed everything</li>
-                    <li class="balancing">Created some bugs to fix later</li>
+                    <li class="changed">Created some bugs to fix later</li>
                 </ul>
             </details>
         </template>
@@ -85,20 +94,24 @@ li::before {
 .feature::before {
     content: "Feature";
     background: var(--accent1);
+    color: var(--background);
 }
 
 .fix::before {
     content: "Fix";
     background: var(--accent2);
+    color: var(--background);
 }
 
-.balancing::before {
-    content: "Balancing";
+.changed::before {
+    content: "Changed";
     background: var(--accent3);
+    color: var(--background);
 }
 
 .breaking::before {
     content: "Breaking";
     background: var(--danger);
+    color: var(--background);
 }
 </style>

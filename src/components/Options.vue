@@ -20,9 +20,10 @@
             </div>
             <div v-if="isTab('appearance')">
                 <Select :title="themeTitle" :options="themes" v-model="theme" />
+                <Select :title="qualityTitle" :options="qualities" v-model="quality" />
                 <component :is="settingFieldsComponent" />
                 <Toggle :title="showTPSTitle" v-model="showTPS" />
-                <Toggle :title="alignModifierUnitsTitle" v-model="alignUnits" />
+                <!-- <Toggle :title="alignModifierUnitsTitle" v-model="alignUnits" /> -->
             </div>
         </template>
     </Modal>
@@ -69,11 +70,26 @@ const themes = Object.keys(rawThemes).map(theme => ({
     value: theme
 }));
 
+const qualities = [
+    {
+        label: "Low",
+        value: 0
+    },
+    {
+        label: "Medium",
+        value: 1
+    },
+    {
+        label: "High",
+        value: 2
+    },
+]
+
 const settingFieldsComponent = computed(() => {
     return coerceComponent(jsx(() => (<>{settingFields.map(render)}</>)));
 });
 
-const { showTPS, theme, unthrottled, alignUnits } = toRefs(settings);
+const { showTPS, theme, unthrottled, alignUnits, quality } = toRefs(settings);
 const { autosave, offlineProd } = toRefs(player);
 const isPaused = computed({
     get() {
@@ -112,6 +128,12 @@ const themeTitle = jsx(() => (
     <span class="option-title">
         Theme
         <desc>How the game looks.</desc>
+    </span>
+));
+const qualityTitle = jsx(() => (
+    <span class="option-title">
+        Quality
+        <desc>How much should the game trade performance for visual quality.</desc>
     </span>
 ));
 const showTPSTitle = jsx(() => (

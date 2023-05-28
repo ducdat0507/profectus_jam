@@ -32,6 +32,7 @@ import ModalVue from "components/Modal.vue";
 import { GenericRepeatable, createRepeatable } from "features/repeatable";
 import Formula from "game/formulas/formulas";
 import { createCostRequirement, displayRequirements } from "game/requirements";
+import settings from "game/settings";
 
 const buildings = b as { [key: string]: BuildingType };
 
@@ -126,7 +127,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
         cycleProgress.value = 0;
         resources.energy.value = Decimal.mul(main.upgrades.startEnergy.amount.value, 25)
             .add(main.getCapsuleEffect("energy")).add(100).toNumber();
-        resources.info.value;
+        resources.info.value = 0;
         nextTick(() => {
             resourcesTotal.energy.value = resourcesTotal.info.value = 0;
         })
@@ -144,17 +145,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
 
         sellCooldown.value = 0;
 
-        switch (main.selectedGameMode.value) {
-            case "standard":
-                health.value = 100;
-                break;
-            case "boosted":
-                health.value = 50;
-                break;
-            case "hardcore":
-                health.value = Number.EPSILON;
-                break;
-        }
+        health.value = 100;
         
         let timeout = () => setTimeout(() => {
             if (board.stage.value) {
@@ -235,7 +226,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
 
     function spawnEnemies() {
 
-        let count = 1 + (0.1 * cycle.value) + (0.01 * cycle.value * cycle.value);
+        let count = 1 + (0.1 * cycle.value) + (0.01 * cycle.value * Math.min(cycle.value, 40));
         count = Math.floor(count) + (Math.random() < (count % 1) ? 1 : 0);
         let loopList = Object.values(loops.value);
         if (loopList.length <= 0) return;
@@ -246,15 +237,15 @@ const layer = createLayer(id, function (this: BaseLayer) {
                 enemyFactor = 1;
                 break;
             case "boosted":
-                enemyFactor = 1.1;
+                enemyFactor = 1.5;
                 break;
             case "hardcore":
-                enemyFactor = 1.2;
+                enemyFactor = 2;
                 break;
         }
 
         for (let a = 0; a < count; a++) {
-            let health = 18 * (1.05 ** (cycle.value ** enemyFactor)) * (Math.random() * .2 + .9);
+            let health = 18 * (1 + 0.05 * (cycle.value * enemyFactor) ** enemyFactor) * 1.02 ** cycle.value * (Math.random() * .2 + .9);
             loopList[Math.floor(Math.random() * loopList.length)].enemies.push({
                 angle: Math.random(),
                 lifetime: 0,
@@ -473,7 +464,19 @@ const layer = createLayer(id, function (this: BaseLayer) {
             stress.value /= Object.values(loops.value).length * 10 * Decimal.div(upgrades.stress.amount.value, 100).add(1).toNumber();
     
             if (stress.value > 1) {
-                health.value -= (2 ** stress.value) * delta;
+                let healthFactor = 1;
+                switch (main.selectedGameMode.value) {
+                    case "standard":
+                        healthFactor = 1;
+                        break;
+                    case "boosted":
+                        healthFactor = 2;
+                        break;
+                    case "hardcore":
+                        healthFactor = 10;
+                        break;
+                }
+                health.value -= (2 ** stress.value) * delta * healthFactor;
             }
             if (stress.value >= 2) {
                 main.objectives.value.anxiety = main.objectives.value.anxiety ?? 0;
@@ -595,7 +598,8 @@ const layer = createLayer(id, function (this: BaseLayer) {
                     }
                 }
     
-                for (let enm of enemies) {
+                
+                if (settings.quality >= 1) for (let enm of enemies) {
                     let {x, y} = enm.position;
                     
                     nodes.push({
@@ -627,6 +631,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
         },
         links() {
             let links: BoardNodeLink[] = [];
+            if (settings.quality < 2) return links;
             for (let [lid, loop] of Object.entries(loops.value)) {
                 for (let enemy of loop.enemies) {
                     if (enemy[BoardConnections]) {

@@ -153,6 +153,34 @@ export const hourglass = {
     },
 } as BuildingType;
 
+export const xray = {
+    name: "X-Ray",
+    icon: "🩻", color: "#afcfef", class: "damager",
+    description: "Deals continuous damage to an enemy on the loop it's on. Prioritizes enemies with the least amount of absolute health.",
+    baseCost: { energy: 200, },
+    upgrades: {
+        damage: { 
+            name: "Damage", 
+            effect: (x) => 8 + 2 * x, 
+            cost: (x) => ({ energy: 150 * 1.2 ** x }), 
+            unit: "/s",
+        },
+    },
+    progress: self => self.data.prg,
+    onUpdate(self, loop, delta, inf) {
+        if (loop.enemies.length) {
+            let dam = this.upgrades.damage.effect(self.upgrades.damage ?? 0) * (inf.damage ?? 1);
+            let target = loop.enemies[0];
+            for (let a = 1; a < loop.enemies.length; a++) {
+                if (loop.enemies[a].health < target.health) target = loop.enemies[a];
+            }
+            dealDamage(target, dam * delta);
+            if (!target[BoardConnections]) target[BoardConnections] = {};
+            target[BoardConnections][loop[BoardID] ?? 0] = 0;
+        }
+    },
+} as BuildingType;
+
 export const plasma = {
     name: "Plasma",
     icon: "⚪", color: "#efbfbf", class: "damager",
@@ -206,6 +234,158 @@ export const bomber = {
                     if (!enm[BoardConnections]) enm[BoardConnections] = {};
                     enm[BoardConnections][loop[BoardID] ?? 0] = 0;
                 }
+                self.data.prg -= 1;
+            }
+        } else {
+            self.data.prg = 0;
+        }
+    },
+} as BuildingType;
+
+export const winder = {
+    name: "Winder",
+    icon: "💨", color: "#efbfbf", class: "damager",
+    description: "Deal damage to all enemies on the loop it's on every 3 seconds. This building charges 5% faster for every enemy that's on the loop it's on.",
+    baseCost: { energy: 250, },
+    upgrades: {
+        damage: { 
+            name: "Damage", 
+            effect: (x) => 10 + 2 * x, 
+            cost: (x) => ({ energy: 200 * 1.2 ** x }), 
+            unit: "/hit",
+        },
+    },
+    progress: self => self.data.prg,
+    onUpdate(self, loop, delta, inf) {
+        if (loop.enemies.length) {
+            let int = 3 * (inf.speed ?? 1);
+            for (let enm of loop.enemies) {
+                if (enm.speed > 0) int /= 1.05;
+            }
+            self.data.prg = ((self.data.prg ?? 0) as number) + delta / int;
+
+            if (self.data.prg >= 1) {
+                let dam = this.upgrades.damage.effect(self.upgrades.damage ?? 0) * (inf.damage ?? 1);
+                for (let enm of loop.enemies) {
+                    dealDamage(enm, dam);
+                    if (!enm[BoardConnections]) enm[BoardConnections] = {};
+                    enm[BoardConnections][loop[BoardID] ?? 0] = 0;
+                }
+                self.data.prg -= 1;
+            }
+        } else {
+            self.data.prg = 0;
+        }
+    },
+} as BuildingType;
+
+export const antiwinder = {
+    name: "Anti-winder",
+    icon: "🍃", color: "#efbfbf", class: "damager",
+    description: "Deal damage to all enemies on the loop it's on every 2 seconds. This building charges 10% slower for every enemy that's on the loop it's on, and charging progress is halved every time an enemy enters it.",
+    baseCost: { energy: 200, },
+    upgrades: {
+        damage: { 
+            name: "Damage", 
+            effect: (x) => 10 + 2 * x, 
+            cost: (x) => ({ energy: 200 * 1.2 ** x }), 
+            unit: "/hit",
+        },
+    },
+    progress: self => self.data.prg,
+    onUpdate(self, loop, delta, inf) {
+        if (loop.enemies.length) {
+            let int = 3 * (inf.speed ?? 1);
+            for (let enm of loop.enemies) {
+                if (enm.speed > 0) int *= 1.1;
+            }
+            self.data.prg = ((self.data.prg ?? 0) as number) + delta / int;
+
+            if (self.data.prg >= 1) {
+                let dam = this.upgrades.damage.effect(self.upgrades.damage ?? 0) * (inf.damage ?? 1);
+                for (let enm of loop.enemies) {
+                    dealDamage(enm, dam);
+                    if (!enm[BoardConnections]) enm[BoardConnections] = {};
+                    enm[BoardConnections][loop[BoardID] ?? 0] = 0;
+                }
+                self.data.prg -= 1;
+            }
+        } else {
+            self.data.prg = 0;
+        }
+    },
+    onEnemyEnter(self, loop, enemy, inf) {
+        self.data.prg = ((self.data.prg ?? 0) as number) / 2;
+    }
+} as BuildingType;
+
+export const winderL = {
+    name: "Winder L",
+    icon: "↻", color: "#efbfbf", class: "damager",
+    description: "Deal damage to all enemies on the loop it's on every 3 seconds. This building charges 10% faster for every enemy that travels clockwise.",
+    baseCost: { energy: 200, },
+    upgrades: {
+        damage: { 
+            name: "Damage", 
+            effect: (x) => 10 + 2 * x, 
+            cost: (x) => ({ energy: 200 * 1.2 ** x }), 
+            unit: "/hit",
+        },
+    },
+    progress: self => self.data.prg,
+    onUpdate(self, loop, delta, inf) {
+        if (loop.enemies.length) {
+            let int = 3 * (inf.speed ?? 1);
+            for (let enm of loop.enemies) {
+                if (enm.speed > 0) int /= 1.1;
+            }
+            self.data.prg = ((self.data.prg ?? 0) as number) + delta / int;
+
+            if (self.data.prg >= 1) {
+                let dam = this.upgrades.damage.effect(self.upgrades.damage ?? 0) * (inf.damage ?? 1);
+                for (let enm of loop.enemies) {
+                    dealDamage(enm, dam);
+                    if (!enm[BoardConnections]) enm[BoardConnections] = {};
+                    enm[BoardConnections][loop[BoardID] ?? 0] = 0;
+                }
+                self.data.prg -= 1;
+            }
+        } else {
+            self.data.prg = 0;
+        }
+    },
+} as BuildingType;
+
+export const winderR = {
+    name: "Winder R",
+    icon: "↺", color: "#efbfbf", class: "damager",
+    description: "Deal damage to all enemies on the loop it's on every 3 seconds. This building charges 10% faster for every enemy that travels anti-clockwise.",
+    baseCost: { energy: 200, },
+    upgrades: {
+        damage: { 
+            name: "Damage", 
+            effect: (x) => 10 + 2 * x, 
+            cost: (x) => ({ energy: 200 * 1.2 ** x }), 
+            unit: "/hit",
+        },
+    },
+    progress: self => self.data.prg,
+    onUpdate(self, loop, delta, inf) {
+        if (loop.enemies.length) {
+            let int = 3 * (inf.speed ?? 1);
+            for (let enm of loop.enemies) {
+                if (enm.speed < 0) int /= 1.1;
+            }
+            self.data.prg = ((self.data.prg ?? 0) as number) + delta / int;
+
+            if (self.data.prg >= 1) {
+                let dam = this.upgrades.damage.effect(self.upgrades.damage ?? 0) * (inf.damage ?? 1);
+                for (let enm of loop.enemies) {
+                    dealDamage(enm, dam);
+                    if (!enm[BoardConnections]) enm[BoardConnections] = {};
+                    enm[BoardConnections][loop[BoardID] ?? 0] = 0;
+                }
+                self.data.prg -= 1;
             }
         } else {
             self.data.prg = 0;
@@ -271,21 +451,85 @@ export const pins = {
 export const wysi = {
     name: "When You See It",
     icon: "👈", color: "#afafef", class: "damager",
-    description: "Deal 727 damage to ALL enemies on the board, but only when your Energy counter hits *exactly* 727. Removes itself on the board when triggered or after 727 seconds since it is placed and will not reverse its cost scaling when it does so.",
+    description: "Deal 727 damage to ALL enemies on the board, but only when your Energy hits exactly 727. Removes itself on the board when triggered or 72.7 seconds after it is placed and will not reverse its cost scaling when it does so. Is not affected by enemy effects and influencers.",
     baseCost: { energy: 727, },
     upgrades: {},
-    progress: self => 1 - (self.data.time as number ?? 0) / 727,
+    progress: self => 1 - (self.data.time as number ?? 0) / 72.7,
     onUpdate(self, loop, delta, inf) {
         self.data.time = (self.data.time as number ?? 0) + delta;
         if (Math.floor(gameLayer.resources.energy.value) == 727) {
             for (let loop of Object.values(gameLayer.loops.value)) {
                 for (let enm of loop.enemies) {
-                    enm.health -= 727 * (inf.damage ?? 1);
+                    enm.health -= 727;
                 }
             }
             delete loop.building;
         }
-        if (self.data.time >= 727) delete loop.building;
+        if (self.data.time >= 72.7) delete loop.building;
+    },
+} as BuildingType;
+
+export const snail = {
+    name: "The Snail™",
+    icon: "🐌", color: "#efafef", class: "damager",
+    description: "Deal damage to ALL enemies on the board, every 60 seconds. This building's interval can't be upgraded nor be affected by influencers.",
+    baseCost: { energy: 600, },
+    upgrades: {
+        damage: { 
+            name: "Damage", 
+            effect: (x) => 16 + 4 * x, 
+            cost: (x) => ({ energy: 300 * 2 ** x }),
+            unit: "/hit",
+        },
+    },
+    progress: self => self.data.prg,
+    onUpdate(self, loop, delta, inf) {
+        let dam = this.upgrades.damage.effect(self.upgrades.damage ?? 0) * (inf.damage ?? 1);
+        self.data.prg = ((self.data.prg ?? 0) as number) + delta / 60;
+        if (self.data.prg >= 1) {
+            for (let loop of Object.values(gameLayer.loops.value)) {
+                for (let enm of loop.enemies) {
+                    dealDamage(enm, dam);
+                }
+            }
+            self.data.prg--;
+        }
+    },
+} as BuildingType;
+
+export const turtle = {
+    name: "The Turtle™",
+    icon: "🐢", color: "#efafef", class: "damager",
+    description: "Deal huge damage to an enemy after a long amount of time. Only charges when there are 5 or more enemies on the loop it's on.",
+    baseCost: { energy: 400, },
+    upgrades: {
+        damage: { 
+            name: "Damage", 
+            effect: (x) => 200 + 50 * x, 
+            cost: (x) => ({ energy: 300 * 2 ** x }),
+            unit: "/hit",
+        },
+        interval: { 
+            name: "Interval", max: 15,
+            effect: (x) => 10 * .9 ** x, 
+            cost: (x) => ({ energy: 200 * 1.3 ** x }), 
+            precision: 2, unit: "s",
+        },
+    },
+    progress: self => self.data.prg,
+    onUpdate(self, loop, delta, inf) {
+        if (loop.enemies.length >= 5) {
+            self.data.prg = ((self.data.prg ?? 0) as number) + delta / this.upgrades.interval.effect(self.upgrades.interval ?? 0) * (inf.speed ?? 1);
+            if (self.data.prg >= 1) {
+                let enm = loop.enemies[Math.floor(Math.random() * loop.enemies.length)];
+                dealDamage(enm, this.upgrades.damage.effect(self.upgrades.damage ?? 0) * (inf.damage ?? 1));
+                if (!enm[BoardConnections]) enm[BoardConnections] = {};
+                enm[BoardConnections][loop[BoardID] ?? 0] = 0;
+                self.data.prg--;
+            }
+        } else {
+            self.data.prg = 0;
+        }
     },
 } as BuildingType;
 
@@ -613,7 +857,7 @@ export const multiplier = {
 export const observer = {
     name: "Observer",
     icon: "👁️", color: "#efafcf", class: "generator",
-    description: "Generates Information while an enemy is on the loop it's on. Use Information to purchase global upgrades.",
+    description: "Generates Information while an enemy is on the loop it's on. Use Information to purchase global upgrades (accessed when no loop is selected).",
     baseCost: { energy: 400, },
     upgrades: {
         amount: { 

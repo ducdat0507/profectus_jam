@@ -1,13 +1,18 @@
 import { Shape, NodeTypeOptions, ProgressDisplay } from "features/boards/board";
 import * as b from "./buildings";
-import { Building, BuildingType } from "./data";
+import { Building, BuildingType, Loop } from "./data";
+import settings from "game/settings";
+import { formatWhole } from "util/break_eternity";
 
 const buildings = b as { [key: string]: BuildingType };
 
 export const loop = {
     shape: Shape.Circle,
     size: 50,
-    title: "",
+    title: (node) => { 
+        let count = (node.state as { target: Loop }).target.enemies.length;
+        return settings.quality < 1 && count > 0 ? formatWhole(count) : "";
+    },
     classes: { loop: true },
 } as NodeTypeOptions;
 

@@ -59,6 +59,8 @@
             <span class="save-version">v{{ save.modVersion }}</span
             ><br />
             <div v-if="currentTime">Last played {{ dateFormat.format(currentTime) }}</div>
+            <hr/>
+            <div v-if="progressDisplay"><component :is="progressDisplay" /></div>
         </div>
         <div class="details" v-else-if="save.error == undefined && isEditing">
             <Text v-model="newName" class="editname" @submit="changeName" />
@@ -71,13 +73,17 @@
 
 <script setup lang="ts">
 import Tooltip from "features/tooltips/Tooltip.vue";
-import player from "game/player";
+import player, { LayerData } from "game/player";
 import { Direction } from "util/common";
 import { computed, ref, toRefs, watch } from "vue";
 import DangerButton from "./fields/DangerButton.vue";
 import FeedbackButton from "./fields/FeedbackButton.vue";
 import Text from "./fields/Text.vue";
 import type { LoadablePlayerData } from "./SavesManager.vue";
+import { computeComponent } from "util/vue";
+import { main } from "data/projEntry";
+import { format, formatWhole } from "util/bignum";
+import * as buildings from "data/types/buildings";
 
 const _props = defineProps<{
     save: LoadablePlayerData;
@@ -111,6 +117,14 @@ const currentTime = computed(() =>
     isActive.value ? player.time : (save.value != null && save.value.time) ?? 0
 );
 
+const progressDisplay = computeComponent(
+    computed(() => {
+        let mainLayer = save.value?.layers?.main as LayerData<typeof main> | undefined
+        return formatWhole(Object.keys(mainLayer?.unlockedBuildings || {}).length) + " / " +
+            formatWhole(Object.keys(buildings).length) + " buildings unlocked";
+    })
+);
+
 function changeName() {
     emit("editName", newName.value);
     isEditing.value = false;
@@ -120,7 +134,7 @@ function changeName() {
 <style scoped>
 .save {
     position: relative;
-    border: solid 4px var(--outline);
+    border: solid 4px var(--raised-background);
     padding: 4px;
     background: var(--raised-background);
     margin: var(--feature-margin);

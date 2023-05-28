@@ -86,6 +86,13 @@ ul {
     stroke: #50637c7f;
 	transition: none;
 }
+.game-board .loop .node-title {
+	font-family: "Roboto Mono", monospace;
+	font-size: 900%;
+	opacity: .4;
+	text-anchor: middle;
+	transform: translate(2px, 12px);
+}
 .game-board .loop:hover .body {
 	filter: drop-shadow(0 0 5px #f7f8ff7f);
 }
@@ -310,7 +317,7 @@ ul {
 	overflow: visible scroll;
 }
 
-.building-list::-webkit-scrollbar {
+.building-list:not(.collection)::-webkit-scrollbar {
 	appearance: none;
 	display: none;
 }
@@ -607,12 +614,32 @@ ul {
 	bottom: -5px;
 	z-index: 100;
 }
+.game-mode-card.prev::after, .game-mode-card.next::after {
+	position: absolute;
+	top: calc(50% - 32px);
+	width: 60px;
+	height: 60px;
+	background: #afcfef;
+    border: 2px solid rgba(0, 0, 0, 0.125);
+	box-shadow: 0 2px 4px #0000007f;
+	z-index: 101;
+	font-size: 40px;
+	border-radius: 50%;
+}
 
 .game-mode-card.prev::before {
 	background: linear-gradient(-90deg, transparent, var(--background) 50%);
 }
 .game-mode-card.next::before {
 	background: linear-gradient(90deg, transparent, var(--background) 50%);
+}
+.game-mode-card.prev::after {
+	content: "←";
+	left: 70px;
+}
+.game-mode-card.next::after {
+	content: "→";
+	right: 70px;
 }
 
 .game-mode-card hr {
@@ -656,6 +683,7 @@ ul {
 	border-radius: 12px;
 	background: linear-gradient(#070a13, #171a23);
 	box-shadow: 2px 2px 4px #0007;
+	flex-shrink: 0;
 }
 
 .building-list.collection button.selected {
@@ -723,4 +751,8 @@ ul {
 	} to {
 		transform: translateY(14px);
 	}
+}
+
+.modal-footer .feature {
+	padding-inline: 1em;
 }
