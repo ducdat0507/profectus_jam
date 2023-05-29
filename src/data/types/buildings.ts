@@ -121,6 +121,55 @@ export const blaster = {
     },
 } as BuildingType;
 
+export const stunner = {
+    name: "Stunner",
+    icon: "💫", color: "#afcfef", class: "damager",
+    description: "Shoots one random enemy on the loop it's on once every a certain amount of time. Have a chance to stun enemies.",
+    baseCost: { energy: 200, },
+    upgrades: {
+        damage: { 
+            name: "Damage", 
+            effect: (x) => 20 + 4 * x, 
+            cost: (x) => ({ energy: 100 * 1.2 ** x }),
+            unit: "/hit",
+        },
+        interval: { 
+            name: "Interval", max: 10,
+            effect: (x) => 5 * .9 ** x, 
+            cost: (x) => ({ energy: 100 * 1.3 ** x }), 
+            precision: 2, unit: "s",
+        },
+        chance: { 
+            name: "Stun Chance", max: 5,
+            effect: (x) => 20 + x, 
+            cost: (x) => ({ energy: 200 * 1.5 ** x }),
+            unit: "%",
+        },
+    },
+    progress: self => self.data.prg,
+    onUpdate(self, loop, delta, inf) {
+        if (loop.enemies.length) {
+            self.data.prg = ((self.data.prg ?? 0) as number) + delta / this.upgrades.interval.effect(self.upgrades.interval ?? 0) * (inf.speed ?? 1);
+            self.data.time = ((self.data.time ?? 0) as number) + delta;
+            if (self.data.prg >= 1) {
+                let enm = loop.enemies[Math.floor(Math.random() * loop.enemies.length)];
+                let dam = this.upgrades.damage.effect(self.upgrades.damage ?? 0) + 
+                    Math.log(self.data.time + 1) * this.upgrades.damage2.effect(self.upgrades.damage2 ?? 0);
+                dealDamage(enm, dam * (inf.damage ?? 1));
+                if (Math.random() < this.upgrades.chance.effect(self.upgrades.chance ?? 0) / 100) {
+                    enm.effects.stun = 0.0005;
+                }
+                if (!enm[BoardConnections]) enm[BoardConnections] = {};
+                enm[BoardConnections][loop[BoardID] ?? 0] = 0;
+                self.data.prg--;
+                self.data.time = 0;
+            }
+        } else {
+            self.data.prg = 0;
+        }
+    },
+} as BuildingType;
+
 export const hourglass = {
     name: "Hourglass",
     icon: "⏳", color: "#afcfef", class: "damager",
@@ -393,6 +442,30 @@ export const winderR = {
     },
 } as BuildingType;
 
+export const swamp = {
+    name: "Swamp",
+    icon: "〰️", color: "#efbfbf", class: "damager",
+    description: "Deal damage per second, and slows down all enemies on the loop it's on.",
+    baseCost: { energy: 300, },
+    upgrades: {
+        damage: { 
+            name: "Damage", 
+            effect: (x) => 6 + 2 * x, 
+            cost: (x) => ({ energy: 200 * 1.2 ** x }), 
+            unit: "/s",
+        },
+    },
+    onUpdate(self, loop, delta, inf) {
+        let dam = this.upgrades.damage.effect(self.upgrades.damage ?? 0) * (inf.damage ?? 1);
+        for (let enm of loop.enemies) {
+            dealDamage(enm, dam * delta);
+            enm.effects.swamped = 0.0001;
+            if (!enm[BoardConnections]) enm[BoardConnections] = {};
+            enm[BoardConnections][loop[BoardID] ?? 0] = 0;
+        }
+    },
+} as BuildingType;
+
 export const thunder = {
     name: "Thunder",
     icon: "🌩️", color: "#efefaf", class: "damager",
@@ -529,6 +602,39 @@ export const turtle = {
             }
         } else {
             self.data.prg = 0;
+        }
+    },
+} as BuildingType;
+
+export const fox = {
+    name: "The Fox™",
+    icon: "🦊", color: "#efafef", class: "damager",
+    description: "Deal damage to one enemy on the loop it's on after 3 seconds. Every shoot makes this building charge 10% faster (additively), and is reset when there are no more enemies to shoot at.",
+    baseCost: { energy: 400, },
+    upgrades: {
+        damage: { 
+            name: "Damage", 
+            effect: (x) => 10 + 2 * x, 
+            cost: (x) => ({ energy: 200 * 2 ** x }),
+            unit: "/hit",
+        },
+    },
+    progress: self => self.data.prg,
+    onUpdate(self, loop, delta, inf) {
+        if (loop.enemies.length) {
+            let interval = 3 / (1 + 0.1 * ((self.data.count ?? 0) as number));
+            self.data.prg = ((self.data.prg ?? 0) as number) + delta / interval * (inf.speed ?? 1);
+            if (self.data.prg >= 1) {
+                let enm = loop.enemies[Math.floor(Math.random() * loop.enemies.length)];
+                dealDamage(enm, this.upgrades.damage.effect(self.upgrades.damage ?? 0) * (inf.damage ?? 1));
+                if (!enm[BoardConnections]) enm[BoardConnections] = {};
+                enm[BoardConnections][loop[BoardID] ?? 0] = 0;
+                self.data.prg--;
+                self.data.count = ((self.data.count ?? 0) as number) + 1;
+            }
+        } else {
+            self.data.prg = 0;
+            self.data.count = 0;
         }
     },
 } as BuildingType;

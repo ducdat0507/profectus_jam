@@ -5,6 +5,13 @@
         </template>
         <template v-slot:body>
             <details open>
+                <summary>v0.5 The Last Update (for now) - <time>2023-05-29</time></summary>
+                <ul>
+                    <li class="feature">Added new buildings</li>
+                    <li class="changed">Added transition animations between hub and game</li>
+                </ul>
+            </details>
+            <details open>
                 <summary>v0.4 this game isn't that great tbh - <time>2023-05-28</time></summary>
                 <ul>
                     <li class="feature">Added new buildings</li>
@@ -13,7 +20,7 @@
                     <li class="changed">Style polishments</li>
                 </ul>
             </details>
-            <details open>
+            <details>
                 <summary>v0.3 Lesser Prototypey Thing - <time>2023-05-27</time></summary>
                 <ul>
                     <li class="feature">Added new building type - Influencer</li>
@@ -21,7 +28,7 @@
                     <li class="feature">Added new objectives</li>
                 </ul>
             </details>
-            <details open>
+            <details>
                 <summary>v0.2.1 Slightly Less Prototypey Thing - <time>2023-05-27</time></summary>
                 <ul>
                     <li class="fix">Fix breaking error</li>

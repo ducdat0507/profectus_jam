@@ -71,7 +71,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const capsules = createResource<number>(0, "💊");
     const timeSinceLastClaim = persistent<number>(0);
 
-    const hubState = persistent<string>("idle", false);
+    const hubState = ref("idle");
 
     let bestCycle = {
         standard: persistent<number>(0),
@@ -96,6 +96,44 @@ export const main = createLayer("main", function (this: BaseLayer) {
         objectives: persistent(false),
         capsules: persistent(false),
     } as Record<string, Persistent<boolean>>;
+    
+    const isAnimating = ref<boolean>(false);
+
+    function intro(duration = 1000) {
+        isAnimating.value = true;
+        let start: number | null = null;
+        board.stage.value?.setMinZoom(0.1);
+        function frame(time: number) {
+            if (start === null) start = time;
+            time = (time - start) / duration;
+            
+            let lerp = 1 - (1000 ** (1 - time) - 1) / 999;
+            board.stage.value?.zoomAbs(window.innerWidth / 2, window.innerHeight / 2, Math.max(lerp, 1e-6));
+
+            if (time < 1) requestAnimationFrame(frame);
+            else isAnimating.value = false;
+        }
+        requestAnimationFrame(frame);
+    }
+
+    function outtro(duration = 1000) {
+        isAnimating.value = true;
+        let currentZoom = board.stage.value.getTransform().scale;
+        let start: number | null = null;
+        board.stage.value.smoothMoveTo(window.innerWidth / 2, window.innerHeight / 2);
+        board.stage.value.setMinZoom(0);
+        function frame(time: number) {
+            if (start === null) start = time;
+            time = (time - start) / duration;
+            
+            let lerp = (1000 ** time - 1) / 999;
+            board.stage.value.zoomAbs(window.innerWidth / 2, window.innerHeight / 2, Math.max(currentZoom * (1 - lerp), 1e-6));
+
+            if (time < 1) requestAnimationFrame(frame);
+            else isAnimating.value = false;
+        }
+        requestAnimationFrame(frame);
+    }
 
     let upgrades = {
         startEnergy: createRepeatable(self => ({
@@ -242,8 +280,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
             reward: (x) => ["capsules", Math.floor(3 + x / 2)],
             exclusiveRewards: {
                 3: ["building", "observer"],
-                5: ["building", "overclocker"],
-                7: ["building", "sharpener"],
+                6: ["building", "overclocker"],
+                9: ["building", "sharpener"],
+                12: ["building", "stunner"],
             }
         },
         capsuleCount: {
@@ -264,9 +303,10 @@ export const main = createLayer("main", function (this: BaseLayer) {
             description: "Gain a total of {0} XP.",
             target: noPersist(total),
             goal: (x) => 500 + x * (x + 1) * (x + 2) * 250,
-            reward: (x) => ["capsules", 3],
+            reward: (x) => ["capsules", Math.floor(3 + x / 2)],
             exclusiveRewards: {
                 3: ["building", "lengthener"],
+                6: ["building", "swamp"],
             }
         },
         bestEnergy: {
@@ -277,6 +317,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             reward: (x) => ["xp", 20 + x * (x + 1) * (x + 2) * 1.5],
             exclusiveRewards: {
                 3: ["building", "multiplier"],
+                5: ["building", "fox"],
             }
         },
         bestInfo: {
@@ -738,9 +779,15 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         ? <button
                             class="feature can"
                             onClick={() => {
-                                player.tabs = ["game"];
-                                gameLayer.startGame();
                                 hubModalOpen.value = false;
+                                outtro(1500);
+                                hubState.value = HubState.Transitioning;
+                                setTimeout(() => {
+                                    player.tabs = ["game"];
+                                    gameLayer.startGame();
+                                    gameLayer.intro(2000);
+                                    hubState.value = HubState.Idle;
+                                }, 2000);
                             }}
                         >
                             Start game
@@ -1184,6 +1231,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
         total,
         capsules,
         timeSinceLastClaim,
+
+        intro,
+        outtro,
         
         bestCycle,
         stats,
@@ -1205,7 +1255,10 @@ export const main = createLayer("main", function (this: BaseLayer) {
         display: jsx(() => (
             <>
                 {render(board)}
-                <div class="game-top">
+                <div class={{
+                    "game-top": true,
+                    "hidden": hubState.value == HubState.Transitioning || isAnimating.value,
+                }}>
                     <div style="display: flex; height: 31px; justify-content: center">
                         <span class="bar-label" style="margin: 4px;">
                             {formatWhole(points.value)} xp

@@ -88,6 +88,43 @@ const layer = createLayer(id, function (this: BaseLayer) {
     const sellCooldown = persistent<number>(0);
     
     const xpWorth = ref<number>(0);
+    
+    const isAnimating = ref<boolean>(false);
+
+    function intro(duration = 1000) {
+        isAnimating.value = true;
+        let start: number | null = null;
+        board.stage.value?.setMinZoom(0.1);
+        function frame(time: number) {
+            if (start === null) start = time;
+            time = (time - start) / duration;
+            
+            let lerp = 1 - (1000 ** (1 - time) - 1) / 999;
+            board.stage.value?.zoomAbs(window.innerWidth / 2, window.innerHeight / 2, Math.max(lerp, 1e-6));
+
+            if (time < 1) requestAnimationFrame(frame);
+            else isAnimating.value = false;
+        }
+        requestAnimationFrame(frame);
+    }
+
+    function outtro(duration = 1000) {
+        isAnimating.value = true;
+        let currentZoom = board.stage.value.getTransform().scale;
+        let start: number | null = null;
+        board.stage.value.setMinZoom(0);
+        function frame(time: number) {
+            if (start === null) start = time;
+            time = (time - start) / duration;
+            
+            let lerp = (1000 ** time - 1) / 999;
+            board.stage.value.zoomAbs(window.innerWidth / 2, window.innerHeight / 2, Math.max(currentZoom * (1 - lerp), 1e-6));
+
+            if (time < 1) requestAnimationFrame(frame);
+            else isAnimating.value = false;
+        }
+        requestAnimationFrame(frame);
+    }
 
     const upgrades = {
         stress: createRepeatable(self => ({
@@ -171,7 +208,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
         ] } };
     }
 
-    function endGame() {
+    function endGame(breakTime = 3000, endTime = 6000) {
         gameState.value = GameState.Stopped;
         gameSpeed.value = 0.1;
 
@@ -203,7 +240,12 @@ const layer = createLayer(id, function (this: BaseLayer) {
             }
         }, 0);
         timeout();
+        
+        xpWorth.value = 
+            Math.sqrt(cycle.value) * Math.sqrt(lifetime.value / 60) * (1 + main.getCapsuleEffect("xp") / 100)
+            * Object.values(resourcesTotal).reduce((x, y) => x + Math.log10(new Decimal(y.value).toNumber() + 1), 1);
 
+        xpWorth.value *= gameModes[main.selectedGameMode.value].multiplier;
 
         setTimeout(() => {
             for (let node of unref(board.state).nodes) {
@@ -212,16 +254,11 @@ const layer = createLayer(id, function (this: BaseLayer) {
                     y: Math.random() * -450,
                 }
             }
-        }, 3000);
-        setTimeout(() => {
-            xpWorth.value = 
-                Math.sqrt(cycle.value) * Math.sqrt(lifetime.value / 60) * (1 + main.getCapsuleEffect("xp") / 100)
-                * Object.values(resourcesTotal).reduce((x, y) => x + Math.log10(new Decimal(y.value).toNumber() + 1), 1);
+        }, breakTime);
 
-            xpWorth.value *= gameModes[main.selectedGameMode.value].multiplier;
-        
+        if (endTime) setTimeout(() => {
             endGameModalShown.value = true;
-        }, 6000);
+        }, endTime);
     }
 
     function spawnEnemies() {
@@ -305,6 +342,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
     globalBus.on("onLoad", () => {
         if (gameState.value == GameState.New) {
             startGame();
+            intro(3000);
         } else if (gameState.value == GameState.Stopped) {
             endGame();
         }
@@ -374,7 +412,9 @@ const layer = createLayer(id, function (this: BaseLayer) {
                     let prevAngle = enm.angle;
 
                     let dist = enm.speed * 0.1 * delta;
+                    if (enm.effects.stun) dist *= 0.0005;
                     if (enm.effects.freeze) dist *= 0.5;
+                    if (enm.effects.swamped) dist *= 0.5;
                     if (enm.effects.blaze) dist *= 2;
                     enm.angle += dist;
                     enm.lifetime += Math.abs(dist);
@@ -868,6 +908,9 @@ const layer = createLayer(id, function (this: BaseLayer) {
         name,
         color: "#afcfef",
 
+        intro,
+        outtro,
+
         cycle,
         cycleProgress,
         cycleBar,
@@ -897,7 +940,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
                 {render(board)}
                 <div class={{
                     "game-top": true,
-                    "hidden": gameState.value != GameState.Started || cycle.value <= 0
+                    "hidden": gameState.value != GameState.Started || isAnimating.value || cycle.value <= 0
                 }}>
                     <div style="display: flex; height: 31px">
                         <span class="bar-label">
@@ -915,7 +958,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
                 </div>
                 <div class={{
                     "game-bottom": true,
-                    "hidden": gameState.value != GameState.Started
+                    "hidden": gameState.value != GameState.Started || isAnimating.value
                 }}>{(() => {
                     let state = (board.selectedNode.value?.state as { target: Loop } | undefined);
                     return <>
@@ -986,7 +1029,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
                 })()}</div>
                 <div class={{
                     "game-left": true,
-                    "hidden": gameState.value != GameState.Started || cycle.value <= 0
+                    "hidden": gameState.value != GameState.Started || isAnimating.value || cycle.value <= 0
                 }}>
                     <div class="action-list">
                         <button class="action" onClick={() => gamePaused.value = true}>
@@ -1030,7 +1073,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
                 </div>
                 <div class={{
                     "game-right": true,
-                    "hidden": gameState.value != GameState.Started
+                    "hidden": gameState.value != GameState.Started || isAnimating.value
                 }}>
                     <div class="building-list">
                         {
@@ -1104,12 +1147,19 @@ const layer = createLayer(id, function (this: BaseLayer) {
                                 <button
                                     class="feature can"
                                     onClick={() => {
+                                        endGame(1000, 0);
+                                        setTimeout(() => {
+                                            outtro();
+                                        }, 1000);
+                                        setTimeout(() => {
+                                            loops.value = {}
+                                        }, 2000);
                                         setTimeout(() => {
                                             main.points.value = Decimal.add(main.points.value, xpWorth.value).toNumber();
                                             endGameModalShown.value = false;
+                                            intro();
                                             startGame();
-                                        }, 6010);
-                                        endGame();
+                                        }, 2500);
                                         gamePaused.value = false;
                                     }}
                                 >
@@ -1118,13 +1168,17 @@ const layer = createLayer(id, function (this: BaseLayer) {
                                 <button
                                     class="feature can"
                                     onClick={() => {
+                                        endGame(1000, 0);
+                                        setTimeout(() => {
+                                            outtro();
+                                        }, 1000);
                                         setTimeout(() => {
                                             main.points.value = Decimal.add(main.points.value, xpWorth.value).toNumber();
                                             gameState.value = GameState.Idle;
                                             endGameModalShown.value = false;
                                             player.tabs = ["main"];
-                                        }, 6010);
-                                        endGame();
+                                            main.intro(2000);
+                                        }, 2500);
                                         gamePaused.value = false;
                                     }}
                                 >
@@ -1187,6 +1241,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
                                     onClick={() => {
                                         setTimeout(() => {
                                             main.points.value = Decimal.add(main.points.value, xpWorth.value).toNumber();
+                                            intro();
                                             startGame();
                                         }, 1000);
                                         endGameModalShown.value = false;
@@ -1226,6 +1281,7 @@ const layer = createLayer(id, function (this: BaseLayer) {
                                             main.points.value = Decimal.add(main.points.value, xpWorth.value).toNumber();
                                             gameState.value = GameState.Idle;
                                             player.tabs = ["main"];
+                                            main.intro(2000);
                                         }, 1000);
                                         endGameModalShown.value = false;
                                     }}
